@@ -19,6 +19,11 @@
 // and their buttons are the site's chrome, not this module's. They keep it.
 // Every container tagged here owns its own :hover in discovery-css.ts, because
 // opting out leaves no fallback behind.
+//
+// A button with no container of its own takes it directly - the selector
+// exempts the element as well as the subtree. Missing it does not look like a
+// missing attribute: the button simply answers a colour setting with a
+// different colour from its twin, because core's fill is !important and wins.
 export const PDT_UNSTYLED = { 'data-cactus-unstyled': '' } as const
 
 export type PdtFlowStatus = 'DRAFT' | 'PUBLISHED'

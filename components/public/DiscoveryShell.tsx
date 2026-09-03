@@ -1004,9 +1004,14 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
           </div>
 
           {/* The wide-screen twin of the bar below: same button, same colours,
-              shown only once the questions have scrolled off the top. */}
+              shown only once the questions have scrolled off the top.
+              PDT_UNSTYLED on the button ITSELF, not on a container: it has no
+              container. Without it, core's site-wide `main button:hover` fill
+              lands on this one and not on its twin in the bar - which does sit
+              inside a marked container - and the two answer the same hover
+              colour setting with two different colours. */}
           {showJump && (
-            <button type="button" className="pdt-bar-btn pdt-jump" style={barButtonStyle} onClick={jumpToQuestions}>
+            <button type="button" className="pdt-bar-btn pdt-jump" {...PDT_UNSTYLED} style={barButtonStyle} onClick={jumpToQuestions}>
               Narrow down{selected.size > 0 ? ` (${[...selected.values()].reduce((n, s) => n + s.size, 0)})` : ''}
             </button>
           )}
