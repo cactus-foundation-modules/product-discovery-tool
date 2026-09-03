@@ -95,7 +95,11 @@ export function discoveryCss({ tabletBp, mobileBp }: Breakpoints): string {
 .pdt-skip:focus-visible{outline:2px solid var(--color-primary);outline-offset:2px}
 
 /* Features step --------------------------------------------------------- */
-.pdt-features{display:grid;gap:28px;grid-template-columns:minmax(220px,280px) 1fr;align-items:start}
+.pdt-features{position:relative;display:grid;gap:28px;grid-template-columns:minmax(220px,280px) 1fr;align-items:start}
+/* Out of the grid entirely (see DiscoveryShell): in flow it would be a row of
+   its own, and the gap around it would push the questions down by 20px for a
+   marker nobody can see. */
+.pdt-sticky-sentinel{position:absolute;top:0;left:0;width:1px;height:0;pointer-events:none}
 .pdt-questions{display:flex;flex-direction:column;gap:4px;min-width:0}
 .pdt-question{border:0;border-top:1px solid var(--color-border);margin:0;padding:14px 0 4px}
 .pdt-question:first-of-type{border-top:0}
@@ -118,7 +122,6 @@ export function discoveryCss({ tabletBp, mobileBp }: Breakpoints): string {
 .pdt-option.is-dead .pdt-option-label{text-decoration:line-through}
 .pdt-option-swatch{width:16px;height:16px;border-radius:999px;border:1px solid var(--color-border);flex:none;background-size:cover;background-position:center}
 .pdt-option-note{margin:0 0 4px 26px;font-size:.75rem;color:var(--color-text-muted);line-height:1.4}
-.pdt-secondary-toggle{align-self:flex-start;margin-top:8px}
 .pdt-no-questions{margin:0;font-size:.875rem;color:var(--color-text-muted)}
 
 .pdt-results{display:flex;flex-direction:column;gap:14px;min-width:0}
@@ -196,8 +199,33 @@ export function discoveryCss({ tabletBp, mobileBp }: Breakpoints): string {
      minmax(min(100%, 230px), 1fr) and not minmax(230px, 1fr): the bare form
      cannot go narrower than its floor, so at any width under 230px the track
      overflows the page and takes the whole grid sideways with it. */
-  .pdt-features.pdt-pos-top{grid-template-columns:1fr;gap:20px}
-  .pdt-features.pdt-pos-top .pdt-questions{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:10px;align-items:start;padding-bottom:22px;border-bottom:1px solid var(--color-border)}
+  /* Block, NOT a one-column grid. A grid item's containing block is its grid
+     area, and position:sticky cannot travel outside its containing block -
+     so a sticky bar in row one of a two-row grid is pinned to the height of
+     row one, which is itself, and never sticks to anything. As a block child
+     its containing block is the whole features box, questions and results
+     together, which is the height it needs to travel. (This is the same reason
+     filters' sticky sidebar works: there the panel's grid area is the full
+     height of the results beside it.) The gap becomes a margin with it. */
+  .pdt-features.pdt-pos-top{display:block}
+  .pdt-features.pdt-pos-top>.pdt-questions{margin-bottom:20px}
+  /* Sticky, so the answers stay reachable once the shopper is down among the
+     products. The offset is a variable a site with a taller header can move,
+     spelled the way filters' own sticky panel spells its own. z-index above the
+     cards it paints over and far below the dialogs. The padding is the same
+     stuck or not: sticky keeps its space in the flow, so changing the box's
+     size on stick would shunt the whole page. */
+  .pdt-features.pdt-pos-top .pdt-questions{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:10px;align-items:start;padding:10px 0 22px;border-bottom:1px solid var(--color-border);position:sticky;top:var(--pdt-sticky-top,7rem);z-index:5}
+  /* Only once it is actually over the products does it need a ground of its
+     own. The cap is for the case where the shopper opens a question while it is
+     pinned: a tall one would otherwise fill the window it is floating over. */
+  .pdt-features.pdt-pos-top .pdt-questions.is-stuck{background:var(--color-page-bg,var(--color-bg));box-shadow:0 8px 20px rgba(0,0,0,.10);max-height:78vh;overflow:auto;overscroll-behavior:contain}
+  /* An open question takes the whole row and lays its options out across it -
+     the same reading as the drawer on a tablet, for the same reason: a column
+     230px wide leaves three quarters of the row empty. Only one is ever open
+     here (see StepFeatures), so this is one band, never a wall. */
+  .pdt-features.pdt-pos-top .pdt-question:not(.is-closed){grid-column:1/-1}
+  .pdt-features.pdt-pos-top .pdt-question:not(.is-closed) .pdt-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,215px),1fr));gap:4px 20px;align-items:start}
   /* The panel's own label earns its place here: down the left the step heading
      is answer enough, but a bare row of controls above the products needs
      saying. The sheet's close button has nothing to close. */
@@ -208,7 +236,6 @@ export function discoveryCss({ tabletBp, mobileBp }: Breakpoints): string {
   .pdt-features.pdt-pos-top .pdt-question.is-closed .pdt-question-head{padding-bottom:11px}
   .pdt-features.pdt-pos-top .pdt-question-body{padding:0 14px 12px}
   .pdt-features.pdt-pos-top .pdt-options{padding-bottom:6px}
-  .pdt-features.pdt-pos-top .pdt-secondary-toggle{grid-column:1/-1;justify-self:start;margin-top:0}
   .pdt-features.pdt-pos-top .pdt-no-questions{grid-column:1/-1}
 }
 .pdt-bar-btn{appearance:none;border:1px solid var(--color-border);background:var(--color-surface);border-radius:999px;padding:12px 18px;font:inherit;font-size:.9375rem;color:var(--color-text);cursor:pointer}

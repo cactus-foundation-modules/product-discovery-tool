@@ -36,6 +36,13 @@ CREATE TABLE IF NOT EXISTS "pdt_flows" (
   -- warning in the admin rather than the database refusing a rename it should
   -- never have had a say in.
   "scope_slug" TEXT,
+  -- What the shopper reads above each step. Empty means the wording the module
+  -- ships ("What are you looking for?", "Which sort of desks?", "What matters
+  -- to you?"); `later_step_heading` may carry {choice}, which is replaced with
+  -- the answer they have just given. Added again in 002 for existing installs.
+  "first_step_heading" TEXT,
+  "later_step_heading" TEXT,
+  "features_heading" TEXT,
   "meta_title" TEXT,
   "meta_description" TEXT,
   -- Social share image, held as a media url (lib/media-reference-rewriter.ts

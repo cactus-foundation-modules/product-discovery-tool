@@ -7,6 +7,7 @@ import {
   currentStepIndex,
   formatPickPath,
   parsePickPath,
+  stepHeading,
   walkPath,
   MAX_PICK_DEPTH,
 } from '@/modules/product-discovery-tool/lib/flow'
@@ -136,5 +137,38 @@ describe('answerAt and clearFrom', () => {
   it('removes an answer and everything below it', () => {
     expect(clearFrom(['desks', 'rectangular'], 1)).toEqual(['desks'])
     expect(clearFrom(['desks', 'rectangular'], 0)).toEqual([])
+  })
+})
+
+describe('stepHeading', () => {
+  it('uses the module\u2019s own words when the flow has written none', () => {
+    expect(stepHeading({ kind: 'browse', parentLabel: null }, {})).toBe('What are you looking for?')
+    expect(stepHeading({ kind: 'features', parentLabel: null }, {})).toBe('What matters to you?')
+    expect(stepHeading({ kind: 'browse', parentLabel: 'Desks' }, {})).toBe('Which sort of desks?')
+  })
+
+  it('prefers the flow\u2019s own wording', () => {
+    expect(stepHeading({ kind: 'browse', parentLabel: null }, { first: 'What are you looking for today?' }))
+      .toBe('What are you looking for today?')
+    expect(stepHeading({ kind: 'features', parentLabel: null }, { features: 'Narrow it down' }))
+      .toBe('Narrow it down')
+  })
+
+  it('puts the answer wherever the template asks for it, as written', () => {
+    // Not lowercased here: the owner wrote the sentence and may have started it
+    // with the answer.
+    expect(stepHeading({ kind: 'browse', parentLabel: 'Desks' }, { later: '{choice}: which sort?' }))
+      .toBe('Desks: which sort?')
+    expect(stepHeading({ kind: 'browse', parentLabel: 'Desks' }, { later: 'Which sort of {choice} do you need?' }))
+      .toBe('Which sort of Desks do you need?')
+  })
+
+  it('leaves a template that never names the answer alone', () => {
+    expect(stepHeading({ kind: 'browse', parentLabel: 'Desks' }, { later: 'And which sort?' })).toBe('And which sort?')
+  })
+
+  it('treats blank wording as none at all', () => {
+    // An owner clearing the box leaves an empty string behind, not a null.
+    expect(stepHeading({ kind: 'browse', parentLabel: null }, { first: '   ' })).toBe('What are you looking for?')
   })
 })

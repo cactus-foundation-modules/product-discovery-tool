@@ -54,6 +54,12 @@ export type PdtFlow = {
   introPuck: PdtPuckData | null
   scopeType: PdtFlowScope
   scopeSlug: string | null
+  /** The wording above each step. Null means the module's own, so a site that
+   *  has not written its own keeps up with the copy the module ships.
+   *  `laterStepHeading` may carry {choice}; see PDT_CHOICE_TOKEN. */
+  firstStepHeading: string | null
+  laterStepHeading: string | null
+  featuresHeading: string | null
   metaTitle: string | null
   metaDescription: string | null
   ogImage: string | null

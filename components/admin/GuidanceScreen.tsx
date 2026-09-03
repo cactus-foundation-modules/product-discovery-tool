@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import type { PdtFlow, PdtOptionNote } from '@/modules/product-discovery-tool/lib/types'
 import { CARD, LABEL, PDT_API, type PdtVocabulary } from '@/modules/product-discovery-tool/components/admin/shared'
+import { PicturePicker } from '@/modules/product-discovery-tool/components/admin/PicturePicker'
 
 // The coverage screen.
 //
@@ -121,10 +122,12 @@ function NoteEditor({ filterId, note, send, busy }: {
           <span style={LABEL}>Worth knowing</span>
           <textarea className="form-control" rows={2} value={watchOut} onChange={(e) => setWatchOut(e.target.value)} />
         </label>
-        <label>
-          <span style={LABEL}>Picture URL</span>
-          <input className="form-control" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} />
-        </label>
+        <PicturePicker
+          label="Picture"
+          hint="From your media library, so it follows the file when you optimise or move it."
+          value={imageUrl || null}
+          onChange={(url) => setImageUrl(url ?? '')}
+        />
         <label>
           <span style={LABEL}>Read more at</span>
           <input className="form-control" value={learnMoreHref} onChange={(e) => setLearnMoreHref(e.target.value)} />

@@ -47,6 +47,16 @@ export const LABEL: React.CSSProperties = {
   marginBottom: '0.3rem',
 }
 
+/** The small grey line under a field, for the cases where the label alone
+ *  cannot carry the rule - a placeholder token, a unit, a consequence. */
+export const HINT: React.CSSProperties = {
+  display: 'block',
+  marginTop: '0.3rem',
+  fontSize: '0.75rem',
+  color: 'var(--color-text-muted)',
+  lineHeight: 1.4,
+}
+
 export function scopeOptions(vocab: PdtVocabulary, type: string): PdtScopeOption[] {
   if (type === 'CATEGORY') return vocab.categories
   if (type === 'COLLECTION') return vocab.collections

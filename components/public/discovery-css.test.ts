@@ -107,6 +107,45 @@ describe('discovery stylesheet', () => {
     expect(/\.pdt-browse-foot\.is-beside\{([^}]*)\}/.exec(css)?.[1] ?? '').toContain('flex-direction:column')
   })
 
+  it('opens a question across the whole row, options and all', () => {
+    // A question opened in the bar takes the full width and lays its options
+    // out across it. Both halves are desktop-only: in the drawer the question
+    // already has the width, and in the sidebar there is no row to span.
+    const desktop = mediaBlocks(css).filter((block) => block.condition.includes('min-width'))
+    const body = desktop.map((block) => block.body).join('')
+    expect(body).toContain('.pdt-features.pdt-pos-top .pdt-question:not(.is-closed){grid-column:1/-1}')
+    expect(/\.pdt-features\.pdt-pos-top \.pdt-question:not\(\.is-closed\) \.pdt-options\{([^}]*)\}/.exec(body)?.[1] ?? '')
+      .toContain('repeat(auto-fit,minmax(min(100%,')
+  })
+
+  it('sticks the question bar at a movable offset, and grounds it only once stuck', () => {
+    const desktop = mediaBlocks(css).filter((block) => block.condition.includes('min-width')).map((b) => b.body).join('')
+    const bar = /\.pdt-features\.pdt-pos-top \.pdt-questions\{([^}]*)\}/.exec(desktop)?.[1] ?? ''
+    expect(bar).toContain('position:sticky')
+    // A site with a taller header moves this rather than editing the module.
+    expect(bar).toContain('top:var(--pdt-sticky-top,7rem)')
+    const stuck = /\.pdt-features\.pdt-pos-top \.pdt-questions\.is-stuck\{([^}]*)\}/.exec(desktop)?.[1] ?? ''
+    expect(stuck).toContain('background:')
+    // Padding cannot differ between the two: sticky keeps its space in the
+    // flow, so a box that changes size on sticking shunts the page under it.
+    expect(stuck).not.toContain('padding')
+  })
+
+  it('lays the across-the-top step out as a block, not a one-column grid', () => {
+    // A grid item's containing block is its grid area, and a sticky box cannot
+    // travel outside its containing block - so the bar in row one of a two-row
+    // grid is pinned to its own height and never sticks to anything. Silent,
+    // untypeable, and the whole feature.
+    const desktop = mediaBlocks(css).filter((block) => block.condition.includes('min-width')).map((b) => b.body).join('')
+    expect(/\.pdt-features\.pdt-pos-top\{([^}]*)\}/.exec(desktop)?.[1] ?? '').toContain('display:block')
+  })
+
+  it('keeps the sticky sentinel out of the grid', () => {
+    // In flow it is a grid row of its own, and the gap around it pushes the
+    // questions down by the gap for a marker with no height and nothing to see.
+    expect(/\.pdt-sticky-sentinel\{([^}]*)\}/.exec(css)?.[1] ?? '').toContain('position:absolute')
+  })
+
   it('leaves the sheet and its scrim above a chat launcher', () => {
     // Same neighbour, same reason, as filters' own sheet: a live-chat launcher
     // parks itself at 2147482000 and would otherwise cover the open drawer.

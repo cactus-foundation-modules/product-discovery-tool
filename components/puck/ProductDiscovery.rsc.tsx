@@ -179,6 +179,7 @@ export async function ProductDiscoveryRsc(props: ProductDiscoveryProps) {
         allowSkip={flow.allowSkip}
         showPrices={flow.showPrices}
         finishCta={flow.finishCtaLabel && flow.finishCtaHref ? { label: flow.finishCtaLabel, href: flow.finishCtaHref } : null}
+        headings={{ first: flow.firstStepHeading, later: flow.laterStepHeading, features: flow.featuresHeading }}
         settings={settings}
         nodes={nodes}
         questions={questions}

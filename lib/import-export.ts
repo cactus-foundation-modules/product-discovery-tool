@@ -88,6 +88,11 @@ export const FlowFileSchema = z.object({
     status: z.enum(['DRAFT', 'PUBLISHED']).optional(),
     heading: z.string().max(200).nullable().optional(),
     standfirst: z.string().max(600).nullable().optional(),
+    /** The wording above each step. Absent means the module's own; the later
+     *  one may carry {choice}. */
+    firstStepHeading: z.string().max(200).nullable().optional(),
+    laterStepHeading: z.string().max(200).nullable().optional(),
+    featuresHeading: z.string().max(200).nullable().optional(),
     scope: ScopeSchema.optional(),
     metaTitle: z.string().max(200).nullable().optional(),
     metaDescription: z.string().max(400).nullable().optional(),
@@ -262,12 +267,15 @@ export async function importFlowFile(file: PdtFlowFile): Promise<{ report: PdtIm
   const flowId = await prisma.$transaction(async (tx) => {
     const rows = await tx.$queryRaw<{ id: string }[]>`
       INSERT INTO "pdt_flows" (
-        "name", "slug", "status", "heading", "standfirst", "scope_type", "scope_slug",
+        "name", "slug", "status", "heading", "standfirst",
+        "first_step_heading", "later_step_heading", "features_heading",
+        "scope_type", "scope_slug",
         "meta_title", "meta_description", "og_image", "noindex",
         "show_prices", "allow_skip", "results_per_page", "finish_cta_label", "finish_cta_href", "position"
       ) VALUES (
         ${file.flow.name}, ${file.flow.slug}, ${file.flow.status ?? 'DRAFT'},
         ${file.flow.heading ?? null}, ${file.flow.standfirst ?? null},
+        ${file.flow.firstStepHeading ?? null}, ${file.flow.laterStepHeading ?? null}, ${file.flow.featuresHeading ?? null},
         ${flowScope.type}, ${flowScope.slug ?? null},
         ${file.flow.metaTitle ?? null}, ${file.flow.metaDescription ?? null}, ${file.flow.ogImage ?? null},
         ${file.flow.noindex ?? false}, ${file.flow.showPrices ?? true}, ${file.flow.allowSkip ?? true},
@@ -280,6 +288,9 @@ export async function importFlowFile(file: PdtFlowFile): Promise<{ report: PdtIm
         "status" = EXCLUDED."status",
         "heading" = EXCLUDED."heading",
         "standfirst" = EXCLUDED."standfirst",
+        "first_step_heading" = EXCLUDED."first_step_heading",
+        "later_step_heading" = EXCLUDED."later_step_heading",
+        "features_heading" = EXCLUDED."features_heading",
         "scope_type" = EXCLUDED."scope_type",
         "scope_slug" = EXCLUDED."scope_slug",
         "meta_title" = EXCLUDED."meta_title",
@@ -466,6 +477,9 @@ export async function exportFlow(flowId: string): Promise<PdtFlowFile | null> {
       status: flow.status,
       heading: flow.heading,
       standfirst: flow.standfirst,
+      firstStepHeading: flow.firstStepHeading,
+      laterStepHeading: flow.laterStepHeading,
+      featuresHeading: flow.featuresHeading,
       scope: { type: flow.scopeType, slug: flow.scopeSlug },
       metaTitle: flow.metaTitle,
       metaDescription: flow.metaDescription,

@@ -20,6 +20,9 @@ const Body = z.object({
   status: z.enum(['DRAFT', 'PUBLISHED']).optional(),
   heading: z.string().max(200).nullable().optional(),
   standfirst: z.string().max(600).nullable().optional(),
+  firstStepHeading: z.string().max(200).nullable().optional(),
+  laterStepHeading: z.string().max(200).nullable().optional(),
+  featuresHeading: z.string().max(200).nullable().optional(),
   // Whatever the builder PUT. Puck owns its own schema; pretending to validate
   // it here would only be a lie with a cast in it.
   introPuck: z.record(z.string(), z.unknown()).nullable().optional(),

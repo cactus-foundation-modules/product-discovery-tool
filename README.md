@@ -14,7 +14,7 @@ It runs entirely on the filters you already have, so nothing is set up twice.
 
 1. **What are you looking for?** Cards for the first level of your tree, each with a square picture, a line about it, and how many products are behind it. They lift on hover the way the product cards later in the flow do. "What is this?" appears only where you have written an explanation, and the block decides whether this first step offers "Compare these" and "Not sure yet" at all.
 2. **Which sort?** The same again, one level down. A branch with nothing under it goes straight to the products - the step count follows the branch, so one route can be two steps and another three.
-3. **What matters to you?** The products are already on screen. Questions run down the side, the important ones open and the rest under "More options", and ticking narrows what is shown with no reload. The block will put them **across the top** of the products instead, where they arrive shut, as a row of controls above the grid - the same choice, worded the same way, as the filter grid's own. On a tablet or a phone both settings do the same thing: the questions sit behind a "Narrow down" bar, because a row of questions above the products is a wall between a phone and the shop.
+3. **What matters to you?** The products are already on screen. Every question is asked - the important ones first - and ticking narrows what is shown with no reload. Questions run down the side, or **across the top** of the products where the block says so: a row of controls that arrive shut, open one at a time across the full width with their options side by side, and stick to the top of the window as the shopper scrolls into the results, shutting the open one on the way so it never covers them. On a tablet or a phone both settings do the same thing: the questions sit behind a "Narrow down" bar, because a row of questions above the products is a wall between a phone and the shop.
 
 Under each step's choices, those two buttons fill the gap at the end of the last row where there is one, and take a centred row of their own where there is not.
 
@@ -31,7 +31,9 @@ Along the way:
 
 Everything lives on **Shop → Products → Product Discovery**, with four tabs.
 
-- **Flow** builds the tree. Each choice gets a picture, a line, the long explanation, its "best for" and "worth knowing", and what it selects - a category, a collection, a tag, some filters, or a category *and* some filters. The live product count sits beside every choice as you build, so one that catches nothing is obvious straight away.
+The three step headings - "What are you looking for?", "Which sort of desks?", "What matters to you?" - are the flow's own words, written on its settings and left empty to keep the module's. The middle one takes `{choice}` where the answer just given should appear.
+
+- **Flow** builds the tree. Each choice gets a picture from your media library, a line, the long explanation, its "best for" and "worth knowing", and what it selects - a category, a collection, a tag, some filters, or a category *and* some filters. The live product count sits beside every choice as you build, so one that catches nothing is obvious straight away.
 - **Questions** decides which filter groups the last step asks, in what order, worded how. Leave it alone and every group is asked anyway, under its own name.
 - **Guidance** is the coverage screen: every option in your whole filter vocabulary, with a tick for the ones you have explained. It is also where a whole flow is downloaded as a file and uploaded again.
 - **Insights** counts which options get picked, which never do, and where people leave. Counts only - no cookie, no visitor record, nothing that could identify anybody, so there is nothing to add to your cookie banner.
@@ -62,3 +64,9 @@ node scripts/import-flow.mjs my-flow.json --dry-run
 ```
 
 Same file, same checks, same code - read the dry run first.
+
+One thing to know about pictures in a file: they travel as urls, and a url moves when the
+picture behind it is optimised, renamed or moved on the site. The site keeps itself
+straight - a moved picture updates every flow that shows it - but a file written last
+month does not know that happened. Download the flow fresh before editing and re-applying
+it, or you will hand back the urls it had when you saved it.

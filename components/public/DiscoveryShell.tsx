@@ -8,7 +8,7 @@ import { FLT_SORT_OPTIONS, FLT_SORT_RECOMMENDED_PARAM, isFltSortValue, sortProdu
 import { EMPTY_SWAP_INDEX, unpackSwaps, type FltSwapIndex } from '@/modules/filters-for-shop/lib/swap-pack'
 import type { FltSwap } from '@/modules/filters-for-shop/lib/db/matching'
 import type { FltPublicGroup, FltVariationIndex } from '@/modules/filters-for-shop/components/public/FilterShell'
-import { answerAt, buildNodeTree, buildSteps, clearFrom, currentStepIndex, formatPickPath, parsePickPath, PICK_PARAM, walkPath, type PdtStep, type PdtTreeNode } from '@/modules/product-discovery-tool/lib/flow'
+import { answerAt, buildNodeTree, buildSteps, clearFrom, currentStepIndex, formatPickPath, parsePickPath, stepHeading, PICK_PARAM, walkPath, type PdtStep, type PdtTreeNode } from '@/modules/product-discovery-tool/lib/flow'
 import { narrowByNode, resolveScope, type PdtShelf } from '@/modules/product-discovery-tool/lib/resolve'
 import { askedQuestions } from '@/modules/product-discovery-tool/lib/questions'
 import { compareFilters, compareNodes, compareProducts, hasComparison, resolveNotes, type PdtGridTable } from '@/modules/product-discovery-tool/lib/compare'
@@ -48,6 +48,9 @@ export type DiscoveryShellProps = {
   allowSkip: boolean
   showPrices: boolean
   finishCta: { label: string; href: string } | null
+  /** The flow's own wording for the three step headings. Anything blank falls
+   *  back to the module's own - see stepHeading. */
+  headings: { first: string | null; later: string | null; features: string | null }
   settings: PdtShellSettings
   nodes: PdtNode[]
   questions: PdtQuestion[]
@@ -121,7 +124,7 @@ const MAX_PRODUCT_COMPARE = 3
 
 export function DiscoveryShell(props: DiscoveryShellProps) {
   const {
-    flowSlug, allowSkip, finishCta, settings, nodes, questions, notes, groups,
+    flowSlug, allowSkip, finishCta, headings, settings, nodes, questions, notes, groups,
     matrix, variations = EMPTY_VARIATIONS, swaps: swapIndex = EMPTY_SWAP_INDEX, sortKeys,
     serverOrder, shelfMembers, columns, pageSize, questionsPosition, autoOpenQuestions, drawerOptions,
     firstStepFoot, defaultSort, tabletBp, initialPick, renderedIds, loadCards, children,
@@ -520,6 +523,57 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
     return () => mq.removeEventListener('change', apply)
   }, [tabletBp])
 
+  // The questions across the top stick to the window as the shopper scrolls
+  // into the products, so the answers stay reachable from anywhere down the
+  // list. Two things follow from that, and both need to know the moment it
+  // happens rather than the fact of it:
+  //
+  //  - an open question is shut, because a full-width one pinned to the top of
+  //    the window covers the products that were just scrolled to;
+  //  - the bar takes a background, because from that point on it is painting
+  //    over cards rather than over the page.
+  //
+  // Detected with a sentinel above the bar rather than by watching the scroll
+  // position: `position: sticky` has no event, and the sentinel leaving the top
+  // of the window IS the bar becoming stuck, at whatever offset the site's
+  // header happens to leave.
+  const stickySentinelRef = useRef<HTMLDivElement>(null)
+  const questionsPanelRef = useRef<HTMLDivElement>(null)
+  const [sentinelPassed, setSentinelPassed] = useState(false)
+  const [collapseSignal, setCollapseSignal] = useState(0)
+  const stuckLayout = questionsPosition === 'top' && !isSheet
+  // Derived, not stored: a layout that has no sticky bar is not stuck, whatever
+  // the last observation said, and re-observing corrects the flag on its own
+  // first callback when the bar comes back.
+  const questionsStuck = stuckLayout && sentinelPassed
+
+  useEffect(() => {
+    if (!stuckLayout || typeof IntersectionObserver === 'undefined') return
+    const sentinel = stickySentinelRef.current
+    const panel = questionsPanelRef.current
+    if (!sentinel || !panel) return
+    // The offset the bar actually sticks at, read off the bar rather than
+    // guessed: it is whatever --pdt-sticky-top resolves to, which a site with a
+    // taller header is meant to change. Shrinking the observer's top edge by
+    // the same amount makes "the sentinel has left" mean "the bar has stuck",
+    // to the pixel - without it the bar would be pinned over the products for
+    // the height of the header before this noticed.
+    const offset = Math.max(0, Number.parseFloat(getComputedStyle(panel).top) || 0)
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry) return
+        // Above the line, not merely outside it: a sentinel still below the
+        // fold is unobserved too, and that is a page nobody has scrolled yet.
+        const stuck = !entry.isIntersecting && entry.boundingClientRect.top <= offset
+        setSentinelPassed(stuck)
+        if (stuck) setCollapseSignal((n) => n + 1)
+      },
+      { threshold: 0, rootMargin: `-${offset}px 0px 0px 0px` },
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [stuckLayout, step.kind])
+
   // Arriving at step three on a phone or tablet can open the questions drawer
   // rather than waiting for a tap on "Narrow down".
   //
@@ -743,12 +797,14 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
 
   const totalSteps = lastIndex + 1
   const stepNumber = Math.min(stepIndex + 1, totalSteps)
-  const heading =
+  // Narrowed rather than spread: only a browse step has a parent, and the
+  // features step is the one the union proves cannot have one.
+  const heading = stepHeading(
     step.kind === 'features'
-      ? 'What matters to you?'
-      : step.parent
-        ? `Which sort of ${step.parent.label.toLowerCase()}?`
-        : 'What are you looking for?'
+      ? { kind: 'features', parentLabel: null }
+      : { kind: 'browse', parentLabel: step.parent?.label ?? null },
+    headings,
+  )
 
   // "Compare these" and "Not sure yet" under a browse step - everywhere but the
   // first step, where the block decides.
@@ -832,7 +888,11 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
         />
       ) : (
         <div className={`pdt-features pdt-pos-${questionsPosition === 'top' ? 'top' : 'left'} pdt-opts-${drawerOptions === 'one-per-line' ? 'rows' : 'grid'}`}>
-          <div className={`pdt-questions${sheetOpen ? ' is-open' : ''}`} {...PDT_UNSTYLED} role={isSheet ? 'dialog' : undefined} aria-modal={isSheet && sheetOpen ? true : undefined} aria-label="Narrow these down">
+          {/* The sticky sentinel. A zero-height marker rather than a measured
+              scroll position, and outside the bar so it scrolls away while the
+              bar stays put. */}
+          {stuckLayout && <div className="pdt-sticky-sentinel" ref={stickySentinelRef} aria-hidden />}
+          <div ref={questionsPanelRef} className={`pdt-questions${sheetOpen ? ' is-open' : ''}${questionsStuck ? ' is-stuck' : ''}`} {...PDT_UNSTYLED} role={isSheet ? 'dialog' : undefined} aria-modal={isSheet && sheetOpen ? true : undefined} aria-label="Narrow these down">
             <div className="pdt-questions-head">
               <strong>Narrow these down</strong>
               <button type="button" className="pdt-dialog-close" onClick={() => setSheetOpen(false)} aria-label="Close">
@@ -847,7 +907,8 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
               showCounts={settings.showCounts}
               // Only across the top, and only where that layout is actually in
               // force: in the sheet the questions ARE the screen, so they open.
-              startCollapsed={questionsPosition === 'top' && !isSheet}
+              startCollapsed={stuckLayout}
+              collapseSignal={collapseSignal}
               onToggle={toggleFilter}
               onExplain={explainFilter}
               onCompare={compareGroup}

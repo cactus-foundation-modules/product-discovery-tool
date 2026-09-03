@@ -1,9 +1,10 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { buildNodeTree, type PdtTreeNode } from '@/modules/product-discovery-tool/lib/flow'
+import { buildNodeTree, PDT_CHOICE_TOKEN, PDT_DEFAULT_HEADINGS, type PdtTreeNode } from '@/modules/product-discovery-tool/lib/flow'
 import type { PdtFlow, PdtNode } from '@/modules/product-discovery-tool/lib/types'
-import { CARD, LABEL, PDT_API, scopeOptions, type PdtVocabulary } from '@/modules/product-discovery-tool/components/admin/shared'
+import { CARD, HINT, LABEL, PDT_API, scopeOptions, type PdtVocabulary } from '@/modules/product-discovery-tool/components/admin/shared'
+import { PicturePicker } from '@/modules/product-discovery-tool/components/admin/PicturePicker'
 
 // The tree builder.
 //
@@ -248,6 +249,43 @@ function FlowSettings({ flow, vocab, flowScopeMissing, adminPath, send, busy }: 
         <textarea className="form-control" rows={2} value={draft.standfirst ?? ''} onChange={(e) => set('standfirst', e.target.value || null)} />
       </label>
 
+      {/* The three questions the shopper is actually asked. Left empty they are
+          the wording the module ships, which is what the placeholders show, so
+          an owner sees what they are replacing before they replace it. */}
+      <div style={{ display: 'grid', gap: '0.75rem', gridTemplateColumns: 'repeat(auto-fit, minmax(15rem, 1fr))', marginTop: '0.75rem' }}>
+        <label>
+          <span style={LABEL}>What the first step asks</span>
+          <input
+            className="form-control"
+            placeholder={PDT_DEFAULT_HEADINGS.first}
+            value={draft.firstStepHeading ?? ''}
+            onChange={(e) => set('firstStepHeading', e.target.value || null)}
+          />
+        </label>
+        <label>
+          <span style={LABEL}>What the steps after it ask</span>
+          <input
+            className="form-control"
+            placeholder="Which sort of desks?"
+            value={draft.laterStepHeading ?? ''}
+            onChange={(e) => set('laterStepHeading', e.target.value || null)}
+          />
+          <span style={HINT}>
+            Write {PDT_CHOICE_TOKEN} where the answer they have just given should appear. Leave it
+            empty for &ldquo;Which sort of&nbsp;…?&rdquo;
+          </span>
+        </label>
+        <label>
+          <span style={LABEL}>What the last step asks</span>
+          <input
+            className="form-control"
+            placeholder={PDT_DEFAULT_HEADINGS.features}
+            value={draft.featuresHeading ?? ''}
+            onChange={(e) => set('featuresHeading', e.target.value || null)}
+          />
+        </label>
+      </div>
+
       <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
         <label style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
           <input type="checkbox" checked={draft.allowSkip} onChange={(e) => set('allowSkip', e.target.checked)} />
@@ -281,6 +319,9 @@ function FlowSettings({ flow, vocab, flowScopeMissing, adminPath, send, busy }: 
             status: draft.status,
             heading: draft.heading,
             standfirst: draft.standfirst,
+            firstStepHeading: draft.firstStepHeading,
+            laterStepHeading: draft.laterStepHeading,
+            featuresHeading: draft.featuresHeading,
             scopeType: draft.scopeType,
             scopeSlug: draft.scopeSlug,
             noindex: draft.noindex,
@@ -339,10 +380,12 @@ function NodeEditor({ node, vocab, send, busy, onDeleted }: {
             </select>
           </label>
         )}
-        <label>
-          <span style={LABEL}>Picture URL</span>
-          <input className="form-control" value={draft.imageUrl ?? ''} onChange={(e) => set('imageUrl', e.target.value || null)} />
-        </label>
+        <PicturePicker
+          label="Picture"
+          hint="From your media library, so it follows the file when you optimise or move it."
+          value={draft.imageUrl ?? null}
+          onChange={(url) => set('imageUrl', url)}
+        />
         <label>
           <span style={LABEL}>Or an emoji</span>
           <input className="form-control" value={draft.icon ?? ''} maxLength={4} onChange={(e) => set('icon', e.target.value || null)} />

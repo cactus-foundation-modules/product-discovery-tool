@@ -16,6 +16,39 @@ export const MAX_PICK_DEPTH = 6
 /** The parameter carrying the browse path. */
 export const PICK_PARAM = 'pick'
 
+/** What a flow writes in its "later steps" heading where the answer the shopper
+ *  has just given should appear: "Which sort of {choice} do you need?". */
+export const PDT_CHOICE_TOKEN = '{choice}'
+
+/** The wording the module ships, used wherever a flow has written none. Kept
+ *  here rather than in the shell so the admin can show the owner exactly what
+ *  they are overriding, and so improving a default reaches every site that has
+ *  not written its own. */
+export const PDT_DEFAULT_HEADINGS = {
+  first: 'What are you looking for?',
+  features: 'What matters to you?',
+} as const
+
+/** The heading above a step.
+ *
+ *  A browse step deeper than the first names the answer that got the shopper
+ *  there. Without a written template that is "Which sort of desks?", the label
+ *  lowercased mid-sentence; with one, the owner's own sentence, and {choice}
+ *  wherever they want the answer in it - which is the only way to write it in a
+ *  language that does not put it there, or to drop it entirely. */
+export function stepHeading(
+  step: { kind: 'browse' | 'features'; parentLabel: string | null },
+  headings: { first?: string | null; later?: string | null; features?: string | null },
+): string {
+  if (step.kind === 'features') return headings.features?.trim() || PDT_DEFAULT_HEADINGS.features
+  if (!step.parentLabel) return headings.first?.trim() || PDT_DEFAULT_HEADINGS.first
+  const template = headings.later?.trim()
+  if (!template) return `Which sort of ${step.parentLabel.toLowerCase()}?`
+  // The label as written, not lowercased: the owner has written the sentence
+  // around it and only they know whether it starts one.
+  return template.split(PDT_CHOICE_TOKEN).join(step.parentLabel)
+}
+
 export type PdtTreeNode = PdtNode & { children: PdtTreeNode[] }
 
 /** Slug segments out of `?pick=desks/height-adjustable`. Empty segments and

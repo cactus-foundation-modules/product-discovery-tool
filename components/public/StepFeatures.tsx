@@ -35,6 +35,7 @@ export function StepFeatures({
   selected,
   showCounts,
   startCollapsed = false,
+  collapseSignal = 0,
   onToggle,
   onExplain,
   onCompare,
@@ -45,8 +46,18 @@ export function StepFeatures({
   /** Whether a question arrives shut. Beside the products there is a column to
    *  fill and they all open; across the top of the results they all start shut,
    *  because a wall of ticks between the shopper and the products is the one
-   *  thing that layout must not do. */
+   *  thing that layout must not do.
+   *
+   *  It also decides how many may be open at once. Shut by default is the
+   *  filter-bar reading - one question opens across the row, and opening the
+   *  next closes it - while open by default is a panel, where closing one to
+   *  read another would be a nuisance. */
   startCollapsed?: boolean
+  /** Bumped by the shell to shut everything again: the questions have just
+   *  stuck to the top of the window, and an open one there would cover the
+   *  products the shopper scrolled down to see. A counter rather than a
+   *  boolean, because what matters is the moment it happens, not the state. */
+  collapseSignal?: number
   onToggle: (groupId: string, filterId: string, multi: boolean) => void
   onExplain: (groupId: string, filterId: string) => void
   onCompare: (groupId: string) => void
@@ -57,7 +68,19 @@ export function StepFeatures({
   // already on screen, and so switching layouts never leaves a stale set
   // behind.
   const [toggled, setToggled] = useState<Set<string>>(new Set())
-  const [showSecondary, setShowSecondary] = useState(false)
+
+  // Every bump shuts the lot. Only ever sent where shut is the resting state,
+  // so there is no layout in which this flings questions open.
+  //
+  // Adjusted during render rather than in an effect - React's own pattern for
+  // state that has to follow a change in props, and the one the shell uses to
+  // reset its result window. An effect would paint the open question once more
+  // before shutting it, which is exactly the flicker this is here to avoid.
+  const [lastCollapseSignal, setLastCollapseSignal] = useState(collapseSignal)
+  if (collapseSignal !== lastCollapseSignal) {
+    setLastCollapseSignal(collapseSignal)
+    setToggled(new Set())
+  }
 
   const primary = questions.filter((q) => q.importance === 'PRIMARY')
   const secondary = questions.filter((q) => q.importance === 'SECONDARY')
@@ -72,6 +95,10 @@ export function StepFeatures({
 
   const toggleOpen = (groupId: string) =>
     setToggled((prev) => {
+      // One at a time where the questions are a bar across the top: an opened
+      // question takes the full width there, and two of them would be a wall
+      // between the shopper and the products again.
+      if (startCollapsed) return prev.has(groupId) ? new Set<string>() : new Set([groupId])
       const next = new Set(prev)
       if (next.has(groupId)) next.delete(groupId)
       else next.add(groupId)
@@ -162,22 +189,14 @@ export function StepFeatures({
     )
   }
 
+  // Every question, always. The important ones still come first - that is what
+  // marking one Primary in the Questions tab now decides - but nothing is
+  // folded away behind "More options": a shopper who cannot see that a question
+  // exists cannot know the answer would have narrowed anything.
   return (
     <>
       {primary.map(renderQuestion)}
-      {secondary.length > 0 && (
-        <>
-          <button
-            type="button"
-            className="pdt-skip pdt-secondary-toggle"
-            aria-expanded={showSecondary}
-            onClick={() => setShowSecondary((on) => !on)}
-          >
-            {showSecondary ? 'Fewer options' : `More options (${secondary.length})`}
-          </button>
-          {showSecondary && secondary.map(renderQuestion)}
-        </>
-      )}
+      {secondary.map(renderQuestion)}
     </>
   )
 }

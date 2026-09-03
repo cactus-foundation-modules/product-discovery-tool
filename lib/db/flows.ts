@@ -6,6 +6,7 @@ import type { PdtFlow, PdtFlowScope, PdtFlowStatus, PdtPuckData } from '@/module
 
 const FLOW_COLUMNS = Prisma.sql`
   "id", "name", "slug", "status", "heading", "standfirst", "intro_puck",
+  "first_step_heading", "later_step_heading", "features_heading",
   "scope_type", "scope_slug", "meta_title", "meta_description", "og_image", "noindex",
   "show_prices", "allow_skip", "results_per_page", "finish_cta_label", "finish_cta_href",
   "position", "updated_at"
@@ -22,6 +23,9 @@ function rowToFlow(row: Record<string, unknown>): PdtFlow {
     // jsonb comes back as an already-parsed JS value, and can legitimately be a
     // bare scalar if something ever wrote one - only an object is a document.
     introPuck: row.intro_puck && typeof row.intro_puck === 'object' ? (row.intro_puck as PdtPuckData) : null,
+    firstStepHeading: (row.first_step_heading as string | null) ?? null,
+    laterStepHeading: (row.later_step_heading as string | null) ?? null,
+    featuresHeading: (row.features_heading as string | null) ?? null,
     scopeType: row.scope_type as PdtFlowScope,
     scopeSlug: (row.scope_slug as string | null) ?? null,
     metaTitle: (row.meta_title as string | null) ?? null,
@@ -170,6 +174,9 @@ export type PdtFlowUpdate = {
   // PdtPuckData: nothing on the write path reads the document, Puck owns its own
   // schema, and pretending to validate it here would only be a lie with a cast.
   introPuck?: Record<string, unknown> | null
+  firstStepHeading?: string | null
+  laterStepHeading?: string | null
+  featuresHeading?: string | null
   scopeType?: PdtFlowScope
   scopeSlug?: string | null
   metaTitle?: string | null
@@ -193,6 +200,9 @@ export async function updateFlow(id: string, fields: PdtFlowUpdate): Promise<voi
       "heading" = CASE WHEN ${fields.heading !== undefined} THEN ${fields.heading ?? null} ELSE "heading" END,
       "standfirst" = CASE WHEN ${fields.standfirst !== undefined} THEN ${fields.standfirst ?? null} ELSE "standfirst" END,
       "intro_puck" = CASE WHEN ${fields.introPuck !== undefined} THEN ${JSON.stringify(fields.introPuck ?? null)}::jsonb ELSE "intro_puck" END,
+      "first_step_heading" = CASE WHEN ${fields.firstStepHeading !== undefined} THEN ${fields.firstStepHeading ?? null} ELSE "first_step_heading" END,
+      "later_step_heading" = CASE WHEN ${fields.laterStepHeading !== undefined} THEN ${fields.laterStepHeading ?? null} ELSE "later_step_heading" END,
+      "features_heading" = CASE WHEN ${fields.featuresHeading !== undefined} THEN ${fields.featuresHeading ?? null} ELSE "features_heading" END,
       "scope_type" = COALESCE(${fields.scopeType ?? null}, "scope_type"),
       "scope_slug" = CASE WHEN ${fields.scopeSlug !== undefined} THEN ${fields.scopeSlug ?? null} ELSE "scope_slug" END,
       "meta_title" = CASE WHEN ${fields.metaTitle !== undefined} THEN ${fields.metaTitle ?? null} ELSE "meta_title" END,
