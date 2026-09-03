@@ -84,6 +84,9 @@ export type DiscoveryShellProps = {
   autoOpenQuestions: boolean
   /** How a question's options stack inside the drawer. */
   drawerOptions: 'side-by-side' | 'one-per-line'
+  /** The "Narrow down" button's own colours, each possibly carrying a dark-mode
+   *  arm as light-dark(l, d). Empty strings mean the module's own. */
+  barButton: { bg: string; text: string; hoverBg: string; hoverText: string }
   /** Whether the FIRST browse step offers "Compare these" and "Not sure yet".
    *  Deeper steps always do. On a flow that opens on "what are you looking
    *  for?" both are noise - skipping it asks for the whole catalogue, which is
@@ -127,7 +130,7 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
     flowSlug, allowSkip, finishCta, headings, settings, nodes, questions, notes, groups,
     matrix, variations = EMPTY_VARIATIONS, swaps: swapIndex = EMPTY_SWAP_INDEX, sortKeys,
     serverOrder, shelfMembers, columns, pageSize, questionsPosition, autoOpenQuestions, drawerOptions,
-    firstStepFoot, defaultSort, tabletBp, initialPick, renderedIds, loadCards, children,
+    firstStepFoot, defaultSort, barButton, tabletBp, initialPick, renderedIds, loadCards, children,
   } = props
 
   const gridRef = useRef<HTMLDivElement>(null)
@@ -806,6 +809,29 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
     headings,
   )
 
+  // The button's colours, handed to the stylesheet as custom properties rather
+  // than as inline declarations on the button: a hover cannot be written inline,
+  // and the sheet already owns every state. An unset colour writes no property
+  // at all, so the rule's own fallback stands.
+  //
+  // The border follows the fill when one is chosen. A solid button still ringed
+  // in the page's border colour reads as a mistake, and asking for the border
+  // separately would be a fifth question nobody wants to answer.
+  const barButtonStyle = useMemo(() => {
+    const style: Record<string, string> = {}
+    if (barButton.bg) {
+      style['--pdt-bar-btn-bg'] = barButton.bg
+      style['--pdt-bar-btn-border'] = barButton.bg
+    }
+    if (barButton.text) style['--pdt-bar-btn-fg'] = barButton.text
+    if (barButton.hoverBg) {
+      style['--pdt-bar-btn-hover-bg'] = barButton.hoverBg
+      style['--pdt-bar-btn-hover-border'] = barButton.hoverBg
+    }
+    if (barButton.hoverText) style['--pdt-bar-btn-hover-fg'] = barButton.hoverText
+    return style as React.CSSProperties
+  }, [barButton.bg, barButton.text, barButton.hoverBg, barButton.hoverText])
+
   // "Compare these" and "Not sure yet" under a browse step - everywhere but the
   // first step, where the block decides.
   const footHere = firstStepFoot || stepIndex > 0
@@ -999,7 +1025,7 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
               close the drawer, which is work the drawer's own close and the
               scrim behind it already do - and with the drawer shut it pointed
               at products that were already on screen and already up to date. */}
-          <div className="pdt-bar" {...PDT_UNSTYLED}>
+          <div className="pdt-bar" {...PDT_UNSTYLED} style={barButtonStyle}>
             <button type="button" className="pdt-bar-btn" onClick={() => setSheetOpen(true)}>
               Narrow down{selected.size > 0 ? ` (${[...selected.values()].reduce((n, s) => n + s.size, 0)})` : ''}
             </button>

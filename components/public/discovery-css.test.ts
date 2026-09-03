@@ -146,6 +146,27 @@ describe('discovery stylesheet', () => {
     expect(/\.pdt-sticky-sentinel\{([^}]*)\}/.exec(css)?.[1] ?? '').toContain('position:absolute')
   })
 
+  it('paints nothing behind the narrow-down button', () => {
+    // A ground on the bar showed as a strip of page colour above and below the
+    // button wherever the section behind it was another shade.
+    const bar = /\.pdt-bar\{([^}]*)\}/.exec(mediaBlocks(css).filter((b) => b.condition.includes('max-width')).map((b) => b.body).join(''))?.[1] ?? ''
+    expect(bar).toContain('background:none')
+    expect(bar).toContain('border:0')
+  })
+
+  it('lets a block recolour that button without losing its own defaults', () => {
+    const rest = /\.pdt-bar-btn\{([^}]*)\}/.exec(css)?.[1] ?? ''
+    const hover = /\.pdt-bar-btn:hover\{([^}]*)\}/.exec(css)?.[1] ?? ''
+    // Custom property FIRST, module's own as the fallback: a block that sets
+    // nothing has to look exactly as it did before the field existed.
+    expect(rest).toContain('background:var(--pdt-bar-btn-bg,var(--color-surface))')
+    expect(rest).toContain('color:var(--pdt-bar-btn-fg,var(--color-text))')
+    expect(hover).toContain('background:var(--pdt-bar-btn-hover-bg,var(--color-primary-subtle))')
+    // Hovered text falls back to the resting text before the theme's, so a
+    // block that colours the button but not its hover keeps a readable label.
+    expect(hover).toContain('color:var(--pdt-bar-btn-hover-fg,var(--pdt-bar-btn-fg,var(--color-text)))')
+  })
+
   it('leaves the sheet and its scrim above a chat launcher', () => {
     // Same neighbour, same reason, as filters' own sheet: a live-chat launcher
     // parks itself at 2147482000 and would otherwise cover the open drawer.

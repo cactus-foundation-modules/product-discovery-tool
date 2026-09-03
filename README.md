@@ -40,6 +40,8 @@ The three step headings - "What are you looking for?", "Which sort of desks?", "
 
 Behaviour switches (counts, comparisons, the never-a-dead-end rule, photo swapping) live on **Shop → Settings → Product Discovery**.
 
+On a phone the "Narrow down" button floats over the products with nothing painted behind it, and its four colours - fill and text, resting and hovered - come from the site's own palette on the block, each able to carry a separate dark-mode answer.
+
 Each flow answers at its own address - `/find-your-desk` - with its own page title, description and share image, and its own designed page layout under **Design → Layouts**. The **Discovery: Guided Flow** block also drops on any ordinary page - a homepage, a category page - where its **Flow** setting picks which flow to run from a list. There is a **Discovery: Launcher** block too, for dropping shoppers into the middle of a flow from a category page or an email.
 
 On a phone or tablet the last step's questions live in a drawer behind one "Narrow down" button. The block decides whether reaching that step opens the drawer or leaves the shopper on the products, and whether a question's options run side by side or one per line. There is no "see the products" button, because the products are already on screen and already up to date - closing the drawer is the X on it, or a tap outside.

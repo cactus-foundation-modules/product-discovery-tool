@@ -174,7 +174,12 @@ export function discoveryCss({ tabletBp, mobileBp }: Breakpoints): string {
   .pdt-questions{position:fixed;inset:auto 0 0 0;z-index:${SHEET_Z + 1};background:var(--color-surface);border-top:1px solid var(--color-border);border-radius:16px 16px 0 0;max-height:80vh;overflow:auto;padding:0 20px 20px;transform:translateY(100%);transition:transform .22s ease}
   .pdt-questions.is-open{transform:translateY(0)}
   .pdt-questions-head{position:sticky;top:0;background:var(--color-surface);display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 0 12px;border-bottom:1px solid var(--color-border);margin-bottom:8px}
-  .pdt-bar{display:flex;position:sticky;bottom:0;z-index:5;gap:10px;padding:10px 0;background:var(--color-bg);border-top:1px solid var(--color-border)}
+  /* No ground and no rule of its own: the bar is a place to put the button, not
+     a band across the page. Painted, it showed as a strip of the page colour
+     above and below the button wherever the section behind it was any other
+     shade. The button carries a shadow instead, which is what lifts it off the
+     products it now floats over. */
+  .pdt-bar{display:flex;position:sticky;bottom:0;z-index:5;gap:10px;padding:10px 0;background:none;border:0}
   .pdt-bar button{flex:1 1 auto}
   /* A tablet's drawer is the full width of the screen, and one tick per line
      leaves three quarters of every row empty. Side by side, the same question
@@ -238,8 +243,13 @@ export function discoveryCss({ tabletBp, mobileBp }: Breakpoints): string {
   .pdt-features.pdt-pos-top .pdt-options{padding-bottom:6px}
   .pdt-features.pdt-pos-top .pdt-no-questions{grid-column:1/-1}
 }
-.pdt-bar-btn{appearance:none;border:1px solid var(--color-border);background:var(--color-surface);border-radius:999px;padding:12px 18px;font:inherit;font-size:.9375rem;color:var(--color-text);cursor:pointer}
-.pdt-bar-btn:hover{border-color:var(--color-primary);background:var(--color-primary-subtle)}
+/* Every colour is a custom property with the module's own as the fallback, so a
+   block that sets none looks exactly as it always did and one that sets some
+   overrides only those. The values may arrive as light-dark(l, d) - the site
+   sets color-scheme, so the browser picks the arm and nothing here has to know
+   which mode is on. */
+.pdt-bar-btn{appearance:none;border:1px solid var(--pdt-bar-btn-border,var(--color-border));background:var(--pdt-bar-btn-bg,var(--color-surface));border-radius:999px;padding:12px 18px;font:inherit;font-size:.9375rem;color:var(--pdt-bar-btn-fg,var(--color-text));cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.18)}
+.pdt-bar-btn:hover{border-color:var(--pdt-bar-btn-hover-border,var(--color-primary));background:var(--pdt-bar-btn-hover-bg,var(--color-primary-subtle));color:var(--pdt-bar-btn-hover-fg,var(--pdt-bar-btn-fg,var(--color-text)))}
 .pdt-bar-btn:focus-visible{outline:2px solid var(--color-primary);outline-offset:2px}
 
 @media (prefers-reduced-motion:reduce){

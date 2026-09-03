@@ -1,3 +1,4 @@
+import { SiteColourField } from '@/lib/puck/fields/registry'
 import { FLT_SORT_OPTIONS, FLT_SORT_RECOMMENDED_PARAM } from '@/modules/filters-for-shop/lib/sort'
 import type { LayoutRef } from '@/lib/puck/LayoutPickerField'
 import { ShopLayoutPicker } from '@/modules/shop/components/public/ShopLayoutPicker'
@@ -37,6 +38,15 @@ export type ProductDiscoveryProps = {
    *  'recommended' standing in for the empty value - a Puck select with a blank
    *  value reads as nothing chosen. */
   defaultSort?: string
+  /** The "Narrow down" button on a phone or tablet. Empty is the module's own
+   *  colouring. Each value may carry a dark-mode arm as light-dark(l, d), which
+   *  is what SiteColourField writes and what the browser resolves against the
+   *  color-scheme the site already sets - so one value covers both modes and
+   *  nothing here has to know which one is on. */
+  barButtonBg?: string
+  barButtonText?: string
+  barButtonHoverBg?: string
+  barButtonHoverText?: string
   layoutRef?: LayoutRef | null
   /** The browse path the address asked for, from `?pick=`. NOT an editor field -
    *  per-request context written into the block's props by the page route,
@@ -100,6 +110,14 @@ const flowField = {
   ),
 }
 
+const colourField = (label: string) => ({
+  type: 'custom' as const,
+  label,
+  render: ({ value, onChange }: { value?: string; onChange: (value: string) => void }) => (
+    <SiteColourField value={value ?? ''} onChange={onChange} label={label} />
+  ),
+})
+
 const layoutField = {
   type: 'custom' as const,
   label: 'Card layout',
@@ -149,6 +167,10 @@ export const productDiscoveryPuckComponent = {
       label: 'Products start sorted by',
       options: FLT_SORT_OPTIONS.map((o) => ({ value: o.value || FLT_SORT_RECOMMENDED_PARAM, label: o.label })),
     },
+    barButtonBg: colourField('“Narrow down” button'),
+    barButtonText: colourField('…its text'),
+    barButtonHoverBg: colourField('…hovered'),
+    barButtonHoverText: colourField('…its text, hovered'),
     layoutRef: layoutField,
   },
   defaultProps: {
@@ -159,6 +181,10 @@ export const productDiscoveryPuckComponent = {
     drawerOptions: 'side-by-side',
     firstStepFoot: 'hide',
     defaultSort: 'best-selling',
+    barButtonBg: '',
+    barButtonText: '',
+    barButtonHoverBg: '',
+    barButtonHoverText: '',
     layoutRef: null,
   },
   render: ProductDiscovery,

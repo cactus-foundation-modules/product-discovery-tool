@@ -200,6 +200,12 @@ export async function ProductDiscoveryRsc(props: ProductDiscoveryProps) {
         // plainer first step rather than two buttons nobody asked for. A flow
         // whose first step is a real narrowing question turns them back on.
         firstStepFoot={props.firstStepFoot === 'show'}
+        barButton={{
+          bg: (props.barButtonBg ?? '').trim(),
+          text: (props.barButtonText ?? '').trim(),
+          hoverBg: (props.barButtonHoverBg ?? '').trim(),
+          hoverText: (props.barButtonHoverText ?? '').trim(),
+        }}
         defaultSort={defaultSort}
         tabletBp={bp.tabletBp}
         initialPick={path.join('/')}

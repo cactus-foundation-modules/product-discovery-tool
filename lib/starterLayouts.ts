@@ -24,7 +24,7 @@ export function productDiscoveryStarters() {
       data: {
         content: [
           block('DiscoveryHeader', 'header-1', { showIntro: 'yes' }),
-          block('ProductDiscovery', 'discovery-1', { columns: 3, questionsPosition: 'left', autoOpenQuestions: 'no', drawerOptions: 'side-by-side', firstStepFoot: 'hide', defaultSort: 'best-selling' }),
+          block('ProductDiscovery', 'discovery-1', { columns: 3, questionsPosition: 'left', autoOpenQuestions: 'no', drawerOptions: 'side-by-side', firstStepFoot: 'hide', defaultSort: 'best-selling', barButtonBg: '', barButtonText: '', barButtonHoverBg: '', barButtonHoverText: '' }),
         ],
         root: { props: {} },
         zones: {},
@@ -35,7 +35,7 @@ export function productDiscoveryStarters() {
       name: 'Straight into the Questions',
       description: 'No heading, no write-up - the first question is the first thing on the page.',
       data: {
-        content: [block('ProductDiscovery', 'discovery-1', { columns: 3, questionsPosition: 'left', autoOpenQuestions: 'no', drawerOptions: 'side-by-side', firstStepFoot: 'hide', defaultSort: 'best-selling' })],
+        content: [block('ProductDiscovery', 'discovery-1', { columns: 3, questionsPosition: 'left', autoOpenQuestions: 'no', drawerOptions: 'side-by-side', firstStepFoot: 'hide', defaultSort: 'best-selling', barButtonBg: '', barButtonText: '', barButtonHoverBg: '', barButtonHoverText: '' })],
         root: { props: {} },
         zones: {},
       },
