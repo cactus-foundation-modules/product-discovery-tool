@@ -6,6 +6,21 @@
 // rules - and is never re-declared here. This module owns the sequencing, the
 // teaching copy and the interface, and nothing else.
 
+// Spread onto every container the module draws its OWN chrome inside.
+//
+// Core paints every <button> inside <main> on the storefront with
+// `background: var(--btn-hover-bg) !important` on hover and does NOT recolour
+// the text with it, so a module's own button flips to the theme's fill while
+// its label stays whatever colour the module gave it - the amber-on-grey that
+// made a chosen card unreadable. The `!important` cannot be outranked, so not
+// matching is the only way out, and the exemption covers the whole subtree.
+//
+// Deliberately NOT on the wizard's root: shop's product cards render inside it,
+// and their buttons are the site's chrome, not this module's. They keep it.
+// Every container tagged here owns its own :hover in discovery-css.ts, because
+// opting out leaves no fallback behind.
+export const PDT_UNSTYLED = { 'data-cactus-unstyled': '' } as const
+
 export type PdtFlowStatus = 'DRAFT' | 'PUBLISHED'
 
 /** What a whole flow is allowed to reach, before any node narrows it. */

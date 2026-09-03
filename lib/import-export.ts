@@ -408,6 +408,15 @@ export async function importFlowFile(file: PdtFlowFile): Promise<{ report: PdtIm
     }
 
     return id
+  }, {
+    // A real flow is a few hundred rows, each its own round trip to the
+    // database, and Prisma closes an interactive transaction after 5 seconds by
+    // default - which a 200-row file blew through from a laptop on the first
+    // try. The whole file must land or none of it, so the transaction stays
+    // and the limit moves: the time is spent waiting on the wire, not holding
+    // locks anything else wants.
+    maxWait: 10_000,
+    timeout: 120_000,
   })
 
   return { report, flowId }

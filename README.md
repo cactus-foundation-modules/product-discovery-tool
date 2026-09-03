@@ -12,9 +12,11 @@ It runs entirely on the filters you already have, so nothing is set up twice.
 
 ## What a shopper sees
 
-1. **What are you looking for?** Cards for the first level of your tree, each with a picture, a line about it, and how many products are behind it.
+1. **What are you looking for?** Cards for the first level of your tree, each with a square picture, a line about it, and how many products are behind it. They lift on hover the way the product cards later in the flow do. "What is this?" appears only where you have written an explanation, and the block decides whether this first step offers "Compare these" and "Not sure yet" at all.
 2. **Which sort?** The same again, one level down. A branch with nothing under it goes straight to the products - the step count follows the branch, so one route can be two steps and another three.
-3. **What matters to you?** The products are already on screen. Questions run down the side, the important ones open and the rest under "More options", and ticking narrows what is shown with no reload.
+3. **What matters to you?** The products are already on screen. Questions run down the side, the important ones open and the rest under "More options", and ticking narrows what is shown with no reload. The block will put them **across the top** of the products instead, where they arrive shut, as a row of controls above the grid - the same choice, worded the same way, as the filter grid's own. On a tablet or a phone both settings do the same thing: the questions sit behind a "Narrow down" bar, because a row of questions above the products is a wall between a phone and the shop.
+
+Under each step's choices, those two buttons fill the gap at the end of the last row where there is one, and take a centred row of their own where there is not.
 
 Along the way:
 
@@ -36,7 +38,9 @@ Everything lives on **Shop → Products → Product Discovery**, with four tabs.
 
 Behaviour switches (counts, comparisons, the never-a-dead-end rule, photo swapping) live on **Shop → Settings → Product Discovery**.
 
-Each flow answers at its own address - `/find-your-desk` - with its own page title, description and share image, and its own designed page layout under **Design → Layouts**. There is a **Discovery: Launcher** block too, for dropping shoppers into the middle of a flow from a category page or an email.
+Each flow answers at its own address - `/find-your-desk` - with its own page title, description and share image, and its own designed page layout under **Design → Layouts**. The **Discovery: Guided Flow** block also drops on any ordinary page - a homepage, a category page - where its **Flow** setting picks which flow to run from a list. There is a **Discovery: Launcher** block too, for dropping shoppers into the middle of a flow from a category page or an email.
+
+On a phone or tablet the last step's questions live in a drawer behind one "Narrow down" button. The block decides whether reaching that step opens the drawer or leaves the shopper on the products, and whether a question's options run side by side or one per line. There is no "see the products" button, because the products are already on screen and already up to date - closing the drawer is the X on it, or a tap outside.
 
 A button at the end of a flow is entirely optional and blank by default. Fill in a label and an address and it appears; leave it and the products are the end of the flow, which is what most shops want.
 

@@ -11,7 +11,7 @@ import { getProductFilterMatches } from '@/modules/filters-for-shop/lib/db/match
 import { applyPriceBands, internVariations, offerGroups } from '@/modules/filters-for-shop/lib/grid-build'
 import { packSwaps } from '@/modules/filters-for-shop/lib/swap-pack'
 import { matchesSelection } from '@/modules/filters-for-shop/lib/filter-logic'
-import type { FltSortKey } from '@/modules/filters-for-shop/lib/sort'
+import { sortProductIds, sortValueFromParam, type FltSortKey } from '@/modules/filters-for-shop/lib/sort'
 import { getFlowBySlug } from '@/modules/product-discovery-tool/lib/db/flows'
 import { listNodes } from '@/modules/product-discovery-tool/lib/db/nodes'
 import { listQuestions } from '@/modules/product-discovery-tool/lib/db/questions'
@@ -129,6 +129,15 @@ export async function ProductDiscoveryRsc(props: ProductDiscoveryProps) {
     }
   }
 
+  // The order the results start in, applied HERE and not only in the browser:
+  // the server draws page one, and a grid that arrived in the shop's own order
+  // and then re-sorted itself on hydration is a page that visibly rearranges
+  // under the shopper. Everything downstream - the cards drawn, the shelf
+  // membership interning, the shell's own `serverOrder` - reads this one array,
+  // so there is only ever one answer to "what order are these in".
+  const defaultSort = sortValueFromParam(props.defaultSort || 'best-selling') ?? ''
+  const orderedIds = defaultSort ? sortProductIds(productIds, sortKeys, defaultSort) : productIds
+
   // What the SERVER should draw cards for: the first page of the state the
   // address describes, worked out with the shell's own rules over the shell's
   // own data, so the first paint is the linked-to step rather than a page of
@@ -141,7 +150,7 @@ export async function ProductDiscoveryRsc(props: ProductDiscoveryProps) {
     const matched = matrix.get(productId) ?? []
     return filterIds.every((id) => matched.includes(id))
   }
-  let eligible: string[] = productIds
+  let eligible: string[] = orderedIds
   for (const node of resolved.nodes) eligible = narrowByNode(eligible, node, shelfLookup, matchesAll)
   const renderIds = eligible
     .filter((id) => matchesSelection(matrix.get(id) ?? [], new Map(), combos.get(id)))
@@ -156,7 +165,7 @@ export async function ProductDiscoveryRsc(props: ProductDiscoveryProps) {
   // whole-catalogue flow carries about a megabyte of repeated UUIDs.
   const variationIndex = internVariations(combos)
   const swapIndex = packSwaps(swaps)
-  const orderIndex = new Map(productIds.map((id, at) => [id, at]))
+  const orderIndex = new Map(orderedIds.map((id, at) => [id, at]))
   const shelfMembers: Record<string, number[]> = {}
   for (const [key, members] of shelfMemberSets) {
     shelfMembers[key] = [...members].map((id) => orderIndex.get(id) ?? -1).filter((at) => at >= 0)
@@ -179,10 +188,18 @@ export async function ProductDiscoveryRsc(props: ProductDiscoveryProps) {
         variations={variationIndex}
         swaps={swapIndex}
         sortKeys={sortKeys}
-        serverOrder={productIds}
+        serverOrder={orderedIds}
         shelfMembers={shelfMembers}
         columns={columns}
         pageSize={pageSize}
+        questionsPosition={props.questionsPosition === 'top' ? 'top' : 'left'}
+        autoOpenQuestions={props.autoOpenQuestions === 'yes'}
+        drawerOptions={props.drawerOptions === 'one-per-line' ? 'one-per-line' : 'side-by-side'}
+        // Default HIDDEN, so a block saved before this field existed gets the
+        // plainer first step rather than two buttons nobody asked for. A flow
+        // whose first step is a real narrowing question turns them back on.
+        firstStepFoot={props.firstStepFoot === 'show'}
+        defaultSort={defaultSort}
         tabletBp={bp.tabletBp}
         initialPick={path.join('/')}
         renderedIds={renderIds}

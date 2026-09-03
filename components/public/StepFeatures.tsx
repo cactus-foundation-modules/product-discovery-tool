@@ -34,6 +34,7 @@ export function StepFeatures({
   questions,
   selected,
   showCounts,
+  startCollapsed = false,
   onToggle,
   onExplain,
   onCompare,
@@ -41,11 +42,21 @@ export function StepFeatures({
   questions: PdtQuestionView[]
   selected: FltSelection
   showCounts: boolean
+  /** Whether a question arrives shut. Beside the products there is a column to
+   *  fill and they all open; across the top of the results they all start shut,
+   *  because a wall of ticks between the shopper and the products is the one
+   *  thing that layout must not do. */
+  startCollapsed?: boolean
   onToggle: (groupId: string, filterId: string, multi: boolean) => void
   onExplain: (groupId: string, filterId: string) => void
   onCompare: (groupId: string) => void
 }) {
-  const [closed, setClosed] = useState<Set<string>>(new Set())
+  // Which questions the shopper has moved AWAY from their starting state, not
+  // which are shut. Held as the difference so a group that only becomes
+  // askable further into the flow arrives the same way round as the ones
+  // already on screen, and so switching layouts never leaves a stale set
+  // behind.
+  const [toggled, setToggled] = useState<Set<string>>(new Set())
   const [showSecondary, setShowSecondary] = useState(false)
 
   const primary = questions.filter((q) => q.importance === 'PRIMARY')
@@ -60,7 +71,7 @@ export function StepFeatures({
   }
 
   const toggleOpen = (groupId: string) =>
-    setClosed((prev) => {
+    setToggled((prev) => {
       const next = new Set(prev)
       if (next.has(groupId)) next.delete(groupId)
       else next.add(groupId)
@@ -69,7 +80,7 @@ export function StepFeatures({
 
   const renderQuestion = (question: PdtQuestionView) => {
     const { group } = question
-    const isClosed = closed.has(group.id)
+    const isClosed = startCollapsed !== toggled.has(group.id)
     const bodyId = `pdt-q-${group.id}`
     const picked = selected.get(group.id)
     const pickedCount = picked?.size ?? 0

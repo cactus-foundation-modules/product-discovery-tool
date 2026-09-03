@@ -12,6 +12,8 @@
 // the list, rather than baked into each entry - the shell builds this list in a
 // memo, and a memo that holds functions closing over the shell's own refs is
 // exactly what React's rules of refs forbid.
+import { PDT_UNSTYLED } from '@/modules/product-discovery-tool/lib/types'
+
 export type PdtAnswerChip =
   | { key: string; kind: 'step'; stepLabel: string; label: string; index: number }
   | { key: string; kind: 'filter'; stepLabel: string; label: string; groupId: string; filterId: string }
@@ -23,7 +25,7 @@ export function AnswerChips({ chips, onRemove, onClearAll }: {
 }) {
   if (chips.length === 0) return null
   return (
-    <div className="pdt-chips">
+    <div className="pdt-chips" {...PDT_UNSTYLED}>
       <p className="pdt-chips-title">Your answers</p>
       {chips.map((chip) => (
         <button

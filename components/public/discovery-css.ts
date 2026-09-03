@@ -16,9 +16,13 @@ const SHEET_Z = 2147482100
 //
 // Three layouts, one DOM:
 // - Desktop: browse cards in a wide grid; the features step puts the questions
-//   down the left of the results.
+//   down the left of the results, or across the top of them when the block is
+//   set that way (`pdt-pos-left` / `pdt-pos-top`, spelled as filters' own grid
+//   spells the same choice).
 // - Tablet and below: one step per screen, the questions behind a sticky
-//   "See N products" bar that opens them as a sheet.
+//   "See N products" bar that opens them as a sheet. BOTH positions land here -
+//   a phone has no room for a row of questions above the products, and the
+//   position field says so.
 // - Phone: the same sheet, rising from the bottom edge.
 export function discoveryCss({ tabletBp, mobileBp }: Breakpoints): string {
   return `
@@ -41,31 +45,51 @@ export function discoveryCss({ tabletBp, mobileBp }: Breakpoints): string {
 .pdt-chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .pdt-chips-title{margin:0;font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--color-text-muted)}
 .pdt-chip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;border:1px solid var(--color-border);background:var(--color-surface);color:var(--color-text);font:inherit;font-size:.8125rem;cursor:pointer}
-.pdt-chip:hover{border-color:var(--color-primary)}
+.pdt-chip:hover{border-color:var(--color-primary);background:var(--color-primary-subtle)}
 .pdt-chip:focus-visible{outline:2px solid var(--color-primary);outline-offset:2px}
 .pdt-chip-group{color:var(--color-text-muted)}
 .pdt-chip-x{font-size:1rem;line-height:1;color:var(--color-text-muted)}
 .pdt-clear{appearance:none;border:0;background:none;padding:4px 6px;border-radius:6px;font:inherit;font-size:.8125rem;color:var(--color-primary);cursor:pointer;text-decoration:underline}
+.pdt-clear:hover{color:var(--color-text)}
 .pdt-clear:focus-visible{outline:2px solid var(--color-primary);outline-offset:2px}
 
 /* Browse steps ---------------------------------------------------------- */
 .pdt-browse{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));margin:0;padding:0;border:0}
 .pdt-browse legend{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
-.pdt-choice{position:relative;display:flex;flex-direction:column;border:1px solid var(--color-border);border-radius:14px;background:var(--color-surface);overflow:hidden}
+.pdt-choice{position:relative;display:flex;flex-direction:column;border:1px solid var(--color-border);border-radius:14px;background:var(--color-surface);overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06);transition:box-shadow .25s ease,transform .25s ease,border-color .25s ease,background .25s ease}
 .pdt-choice:has(.pdt-choice-pick:focus-visible){outline:2px solid var(--color-primary);outline-offset:2px}
-.pdt-choice:hover{border-color:var(--color-primary)}
+/* The same lift, easing and shadow as shop's own product card, deliberately
+   copied value for value: these are cards in the same flow as those, and two
+   nearly-identical hovers read as a bug rather than as two components. */
+.pdt-choice:hover{transform:translateY(-4px);box-shadow:0 8px 30px rgba(0,0,0,.10);border-color:var(--color-primary);background:var(--color-primary-subtle)}
 .pdt-choice-pick{appearance:none;border:0;background:none;padding:0;margin:0;font:inherit;color:inherit;text-align:left;cursor:pointer;display:flex;flex-direction:column;flex:1 1 auto}
 .pdt-choice-pick:focus{outline:none}
-.pdt-choice-pic{aspect-ratio:4/3;background:var(--color-bg-subtle);display:block;width:100%;object-fit:cover}
-.pdt-choice-icon{aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;background:var(--color-bg-subtle);font-size:2rem}
+/* Square, not 4:3. The pictures behind these cards are ordinary product
+   photography of wildly different things - a locker, a monitor arm, a booth -
+   and a square crop is the one shape that treats them all the same. */
+.pdt-choice-pic{aspect-ratio:1/1;background:var(--color-bg-subtle);display:block;width:100%;object-fit:cover}
+.pdt-choice-icon{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;background:var(--color-bg-subtle);font-size:2rem}
 .pdt-choice-body{display:flex;flex-direction:column;gap:4px;padding:14px 16px}
 .pdt-choice-label{font-weight:600;font-size:1rem;color:var(--color-text)}
 .pdt-choice-blurb{font-size:.875rem;color:var(--color-text-muted);line-height:1.45}
 .pdt-choice-count{font-size:.8125rem;color:var(--color-text-muted)}
 .pdt-choice-more{display:flex;gap:12px;padding:0 16px 12px}
 .pdt-link{appearance:none;border:0;background:none;padding:0;font:inherit;font-size:.8125rem;color:var(--color-primary);text-decoration:underline;cursor:pointer}
+/* A link hover changes the TEXT and nothing else. No fill: these sit inside
+   paragraphs and under options, where a pill of colour behind three words reads
+   as a mistake, and --color-text is black on a light theme and white on a dark
+   one without either being spelled out. */
+.pdt-link:hover{color:var(--color-text)}
 .pdt-link:focus-visible{outline:2px solid var(--color-primary);outline-offset:2px}
-.pdt-browse-foot{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+/* Sits IN the browse grid (see StepBrowse). is-beside is the spare cell at the
+   end of a short last row - one button above the other, centred in the hole
+   they are filling. is-below is a row of its own, spanning the lot and centred,
+   which is the only arrangement that does not look abandoned at one end of an
+   otherwise full row. */
+.pdt-browse-foot{display:flex;gap:12px}
+.pdt-browse-foot.is-below{grid-column:1/-1;flex-wrap:wrap;align-items:center;justify-content:center;padding-top:4px}
+.pdt-browse-foot.is-beside{flex-direction:column;align-items:center;justify-content:center;gap:14px}
+.pdt-browse-foot .pdt-skip{padding:12px 26px;font-size:.9375rem}
 .pdt-skip{appearance:none;border:1px solid var(--color-border);background:var(--color-surface);border-radius:999px;padding:8px 16px;font:inherit;font-size:.875rem;color:var(--color-text);cursor:pointer}
 .pdt-skip:hover{border-color:var(--color-primary)}
 .pdt-skip:focus-visible{outline:2px solid var(--color-primary);outline-offset:2px}
@@ -77,6 +101,7 @@ export function discoveryCss({ tabletBp, mobileBp }: Breakpoints): string {
 .pdt-question:first-of-type{border-top:0}
 .pdt-question legend{display:contents}
 .pdt-question-head{display:flex;width:100%;align-items:center;justify-content:space-between;gap:8px;appearance:none;background:none;border:0;padding:0 0 8px;font:inherit;font-weight:600;color:var(--color-text);cursor:pointer;text-align:left}
+.pdt-question-head:hover{text-decoration:underline;text-underline-offset:3px}
 .pdt-question-head:focus-visible{outline:2px solid var(--color-primary);outline-offset:2px}
 .pdt-question-badge{display:inline-flex;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:var(--color-primary);color:var(--color-primary-contrast,#fff);font-size:.6875rem;align-items:center;justify-content:center;margin-left:6px}
 .pdt-chevron{width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);transition:transform .15s ease;flex:none;opacity:.6}
@@ -148,13 +173,53 @@ export function discoveryCss({ tabletBp, mobileBp }: Breakpoints): string {
   .pdt-questions-head{position:sticky;top:0;background:var(--color-surface);display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 0 12px;border-bottom:1px solid var(--color-border);margin-bottom:8px}
   .pdt-bar{display:flex;position:sticky;bottom:0;z-index:5;gap:10px;padding:10px 0;background:var(--color-bg);border-top:1px solid var(--color-border)}
   .pdt-bar button{flex:1 1 auto}
+  /* A tablet's drawer is the full width of the screen, and one tick per line
+     leaves three quarters of every row empty. Side by side, the same question
+     is three or four columns of ticks and the one under it is on screen with
+     it. auto-fit does the phone for free: at 375px only one track fits, which
+     is the one-per-line reading anyway.
+
+     minmax(min(100%, 215px), 1fr) rather than minmax(215px, 1fr): the bare form
+     cannot shrink below its floor, so a narrow phone would scroll sideways. */
+  .pdt-features.pdt-opts-grid .pdt-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,215px),1fr));gap:4px 20px;align-items:start}
 }
 @media (min-width:${tabletBp}){
   .pdt-questions-head{display:none}
+
+  /* Questions across the top ------------------------------------------------
+     One column, so the questions stack above the results in DOM order, and each
+     question becomes a bordered control in an auto-fitting row rather than a
+     line in a list. The row is capped with a rule rather than boxed, which is
+     what filters' own "across the top" does, so a site running both does not
+     get two different ideas of the same layout.
+
+     minmax(min(100%, 230px), 1fr) and not minmax(230px, 1fr): the bare form
+     cannot go narrower than its floor, so at any width under 230px the track
+     overflows the page and takes the whole grid sideways with it. */
+  .pdt-features.pdt-pos-top{grid-template-columns:1fr;gap:20px}
+  .pdt-features.pdt-pos-top .pdt-questions{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:10px;align-items:start;padding-bottom:22px;border-bottom:1px solid var(--color-border)}
+  /* The panel's own label earns its place here: down the left the step heading
+     is answer enough, but a bare row of controls above the products needs
+     saying. The sheet's close button has nothing to close. */
+  .pdt-features.pdt-pos-top .pdt-questions-head{display:flex;grid-column:1/-1;align-items:center;padding:0;margin:0;border:0;font-size:.9375rem}
+  .pdt-features.pdt-pos-top .pdt-questions-head .pdt-dialog-close{display:none}
+  .pdt-features.pdt-pos-top .pdt-question{border:1px solid var(--color-border);border-radius:12px;background:var(--color-surface);padding:0;min-width:0}
+  .pdt-features.pdt-pos-top .pdt-question-head{padding:11px 14px}
+  .pdt-features.pdt-pos-top .pdt-question.is-closed .pdt-question-head{padding-bottom:11px}
+  .pdt-features.pdt-pos-top .pdt-question-body{padding:0 14px 12px}
+  .pdt-features.pdt-pos-top .pdt-options{padding-bottom:6px}
+  .pdt-features.pdt-pos-top .pdt-secondary-toggle{grid-column:1/-1;justify-self:start;margin-top:0}
+  .pdt-features.pdt-pos-top .pdt-no-questions{grid-column:1/-1}
 }
 .pdt-bar-btn{appearance:none;border:1px solid var(--color-border);background:var(--color-surface);border-radius:999px;padding:12px 18px;font:inherit;font-size:.9375rem;color:var(--color-text);cursor:pointer}
-.pdt-bar-primary{background:var(--color-primary);border-color:var(--color-primary);color:var(--color-primary-contrast,#fff)}
+.pdt-bar-btn:hover{border-color:var(--color-primary);background:var(--color-primary-subtle)}
 .pdt-bar-btn:focus-visible{outline:2px solid var(--color-primary);outline-offset:2px}
+
+@media (prefers-reduced-motion:reduce){
+  .pdt-choice{transition:border-color .25s ease,background .25s ease}
+  .pdt-choice:hover{transform:none}
+  .pdt-progress-fill,.pdt-dialog,.pdt-questions,.pdt-scrim{transition:none}
+}
 
 @media (max-width:${mobileBp}){
   .pdt-browse{grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:12px}

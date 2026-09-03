@@ -13,7 +13,7 @@ import { narrowByNode, resolveScope, type PdtShelf } from '@/modules/product-dis
 import { askedQuestions } from '@/modules/product-discovery-tool/lib/questions'
 import { compareFilters, compareNodes, compareProducts, hasComparison, resolveNotes, type PdtGridTable } from '@/modules/product-discovery-tool/lib/compare'
 import { relaxations } from '@/modules/product-discovery-tool/lib/recovery'
-import type { PdtNode, PdtOptionNote, PdtQuestion } from '@/modules/product-discovery-tool/lib/types'
+import { PDT_UNSTYLED, type PdtNode, type PdtOptionNote, type PdtQuestion } from '@/modules/product-discovery-tool/lib/types'
 import type { PdtCardLoader } from '@/modules/product-discovery-tool/lib/cards-binding'
 import { StepBrowse } from '@/modules/product-discovery-tool/components/public/StepBrowse'
 import { StepFeatures, type PdtQuestionView } from '@/modules/product-discovery-tool/components/public/StepFeatures'
@@ -69,6 +69,28 @@ export type DiscoveryShellProps = {
   shelfMembers: Record<string, number[]>
   columns: number
   pageSize: number
+  /** Where step three's questions sit on a wide screen: down the left of the
+   *  results, or across the top of them. Spelled the way filters' own grid
+   *  spells it, because it is the same decision on the same kind of page and a
+   *  site owner should not have to learn it twice. Tablet and below ignore it:
+   *  both layouts put the questions behind the "Narrow down" bar there, which
+   *  is the only sensible answer on a phone. */
+  questionsPosition: 'left' | 'top'
+  /** Whether arriving at step three on a phone or tablet opens the questions
+   *  drawer by itself. */
+  autoOpenQuestions: boolean
+  /** How a question's options stack inside the drawer. */
+  drawerOptions: 'side-by-side' | 'one-per-line'
+  /** Whether the FIRST browse step offers "Compare these" and "Not sure yet".
+   *  Deeper steps always do. On a flow that opens on "what are you looking
+   *  for?" both are noise - skipping it asks for the whole catalogue, which is
+   *  the shop's own grid - while on a flow already scoped to one category the
+   *  first step is a real question and both earn their place. The block
+   *  decides, because only the person who built the flow knows which it is. */
+  firstStepFoot: boolean
+  /** The order the results arrive in, before the shopper touches the dropdown.
+   *  The server has already rendered page one in it. */
+  defaultSort: FltSortValue
   tabletBp: string
   /** The browse path the SERVER rendered for, from `?pick=`. The shell opens on
    *  it so the first paint is the linked-to step rather than step one. */
@@ -101,7 +123,8 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
   const {
     flowSlug, allowSkip, finishCta, settings, nodes, questions, notes, groups,
     matrix, variations = EMPTY_VARIATIONS, swaps: swapIndex = EMPTY_SWAP_INDEX, sortKeys,
-    serverOrder, shelfMembers, columns, pageSize, tabletBp, initialPick, renderedIds, loadCards, children,
+    serverOrder, shelfMembers, columns, pageSize, questionsPosition, autoOpenQuestions, drawerOptions,
+    firstStepFoot, defaultSort, tabletBp, initialPick, renderedIds, loadCards, children,
   } = props
 
   const gridRef = useRef<HTMLDivElement>(null)
@@ -110,7 +133,7 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
   const [path, setPath] = useState<string[]>(() => parsePickPath(initialPick))
   const [skipped, setSkipped] = useState<Set<number>>(new Set())
   const [selected, setSelected] = useState<FltSelection>(new Map())
-  const [sort, setSort] = useState<FltSortValue>('')
+  const [sort, setSort] = useState<FltSortValue>(defaultSort)
   const [shownLimit, setShownLimit] = useState(pageSize)
   const [dialog, setDialog] = useState<Dialog | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -330,14 +353,18 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
       if (pick) params.set(PICK_PARAM, pick)
       else params.delete(PICK_PARAM)
       applySelectionToParams(groups, nextSelected, new Map(), params)
-      if (nextSort) params.set(sortParam, nextSort)
+      // The starting order leaves no trace, whatever it is; everything else
+      // does, including "Recommended" where that is a step away from the
+      // default - or a refresh would land the shopper back on the order they
+      // had just left. Filters' own grid spells it exactly this way.
+      if (nextSort !== defaultSort) params.set(sortParam, nextSort || FLT_SORT_RECOMMENDED_PARAM)
       else params.delete(sortParam)
       const query = params.toString()
       const url = query ? `?${query}` : window.location.pathname
       if (push) window.history.pushState(null, '', url)
       else window.history.replaceState(null, '', url)
     },
-    [groups],
+    [groups, defaultSort],
   )
 
   // ---- Insight beacons --------------------------------------------------
@@ -492,6 +519,24 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
     mq.addEventListener('change', apply)
     return () => mq.removeEventListener('change', apply)
   }, [tabletBp])
+
+  // Arriving at step three on a phone or tablet can open the questions drawer
+  // rather than waiting for a tap on "Narrow down".
+  //
+  // Three guards, and each one is a case where opening would be wrong:
+  //  - only on the way IN to the step, so closing the drawer and ticking a
+  //    filter does not fling it open again;
+  //  - only once the shopper has actually moved, so a shared link that lands on
+  //    step three opens on the products it was shared FOR;
+  //  - only where the drawer exists at all - on a wide screen the questions are
+  //    already on the page and there is nothing to open.
+  const onFeaturesRef = useRef(step.kind === 'features')
+  useEffect(() => {
+    const onFeatures = step.kind === 'features'
+    const arrived = onFeatures && !onFeaturesRef.current
+    onFeaturesRef.current = onFeatures
+    if (arrived && autoOpenQuestions && isSheet && movedRef.current) setSheetOpen(true)
+  }, [step.kind, autoOpenQuestions, isSheet])
 
   useEffect(() => {
     if (!urlRead) return
@@ -705,6 +750,9 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
         ? `Which sort of ${step.parent.label.toLowerCase()}?`
         : 'What are you looking for?'
 
+  // "Compare these" and "Not sure yet" under a browse step - everywhere but the
+  // first step, where the block decides.
+  const footHere = firstStepFoot || stepIndex > 0
   const moreToShow = shownLimit < matchingIds.length
   const canCompareProducts = settings.compareEnabled && questionViews.length > 0
 
@@ -734,13 +782,13 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
       {cardsFailed && (
         // A grid that has stopped growing looks like a grid that has run out, so
         // say so and offer the way back rather than leaving the shopper to guess.
-        <p className="pdt-cards-failed" role="status">
+        <p className="pdt-cards-failed" role="status" {...PDT_UNSTYLED}>
           Those didn&rsquo;t load.{' '}
           <button type="button" className="pdt-link" onClick={() => setCardRetry((n) => n + 1)}>Try again</button>
         </p>
       )}
       {moreToShow && (
-        <div className="pdt-pager" aria-busy={cardsLoading || undefined}>
+        <div className="pdt-pager" aria-busy={cardsLoading || undefined} {...PDT_UNSTYLED}>
           <button type="button" className="pdt-more" onClick={() => setShownLimit((n) => Math.min(n + pageSize, matchingIds.length))}>
             Show more
           </button>
@@ -751,7 +799,7 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
 
   return (
     <div className="pdt-wrap">
-      <div className="pdt-progress">
+      <div className="pdt-progress" {...PDT_UNSTYLED}>
         {stepIndex > 0 && (
           <button type="button" className="pdt-back" onClick={() => backTo(stepIndex - 1)}>‹ Back</button>
         )}
@@ -775,16 +823,16 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
           legend={heading}
           options={browseOptions}
           showCounts={settings.showCounts}
-          allowSkip={allowSkip}
-          canCompare={settings.compareEnabled && hasComparison(compareNodes(step.options))}
+          allowSkip={allowSkip && footHere}
+          canCompare={settings.compareEnabled && footHere && hasComparison(compareNodes(step.options))}
           onPick={pick}
           onSkip={skip}
           onExplain={explainNode}
           onCompare={compareSiblings}
         />
       ) : (
-        <div className="pdt-features">
-          <div className={`pdt-questions${sheetOpen ? ' is-open' : ''}`} role={isSheet ? 'dialog' : undefined} aria-modal={isSheet && sheetOpen ? true : undefined} aria-label="Narrow these down">
+        <div className={`pdt-features pdt-pos-${questionsPosition === 'top' ? 'top' : 'left'} pdt-opts-${drawerOptions === 'one-per-line' ? 'rows' : 'grid'}`}>
+          <div className={`pdt-questions${sheetOpen ? ' is-open' : ''}`} {...PDT_UNSTYLED} role={isSheet ? 'dialog' : undefined} aria-modal={isSheet && sheetOpen ? true : undefined} aria-label="Narrow these down">
             <div className="pdt-questions-head">
               <strong>Narrow these down</strong>
               <button type="button" className="pdt-dialog-close" onClick={() => setSheetOpen(false)} aria-label="Close">
@@ -797,6 +845,9 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
               questions={questionViews}
               selected={selected}
               showCounts={settings.showCounts}
+              // Only across the top, and only where that layout is actually in
+              // force: in the sheet the questions ARE the screen, so they open.
+              startCollapsed={questionsPosition === 'top' && !isSheet}
               onToggle={toggleFilter}
               onExplain={explainFilter}
               onCompare={compareGroup}
@@ -804,7 +855,7 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
           </div>
 
           <div className="pdt-results">
-            <div className="pdt-toolbar">
+            <div className="pdt-toolbar" {...PDT_UNSTYLED}>
               {/* A live region, so a shopper using a screen reader hears the
                   list change as they tick rather than discovering it later. */}
               <p className="pdt-showing" role="status">
@@ -833,7 +884,7 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
             </div>
 
             {compareMode && (
-              <div className="pdt-picks">
+              <div className="pdt-picks" {...PDT_UNSTYLED}>
                 <p className="pdt-picks-note">
                   {comparePicks.length === 0
                     ? `Tick up to ${MAX_PRODUCT_COMPARE} products to see them beside each other.`
@@ -847,7 +898,7 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
 
             {matchingIds.length === 0 && (
               relaxOffers.length > 0 ? (
-                <div className="pdt-recovery" role="status">
+                <div className="pdt-recovery" role="status" {...PDT_UNSTYLED}>
                   <p className="pdt-recovery-title">Nothing matches all of that.</p>
                   <ul className="pdt-recovery-list">
                     {relaxOffers.map((offer) => (
@@ -867,7 +918,7 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
                   </ul>
                 </div>
               ) : (
-                <p className="pdt-empty">
+                <p className="pdt-empty" {...PDT_UNSTYLED}>
                   Nothing matches all of that.{' '}
                   <button type="button" className="pdt-link" onClick={clearFilters}>Clear your answers</button> and try a different combination.
                 </p>
@@ -883,12 +934,13 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
             )}
           </div>
 
-          <div className="pdt-bar">
+          {/* One button, not two. The second used to say "See N products" and
+              close the drawer, which is work the drawer's own close and the
+              scrim behind it already do - and with the drawer shut it pointed
+              at products that were already on screen and already up to date. */}
+          <div className="pdt-bar" {...PDT_UNSTYLED}>
             <button type="button" className="pdt-bar-btn" onClick={() => setSheetOpen(true)}>
               Narrow down{selected.size > 0 ? ` (${[...selected.values()].reduce((n, s) => n + s.size, 0)})` : ''}
-            </button>
-            <button type="button" className="pdt-bar-btn pdt-bar-primary" onClick={() => setSheetOpen(false)}>
-              See {matchingIds.length} {matchingIds.length === 1 ? 'product' : 'products'}
             </button>
           </div>
         </div>
@@ -897,7 +949,7 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
       <div className={`pdt-scrim${dialog || (isSheet && sheetOpen) ? ' is-open' : ''}`} onClick={() => { setDialog(null); setSheetOpen(false) }} aria-hidden />
 
       {dialog && (
-        <div className="pdt-dialog is-open" role="dialog" aria-modal="true" aria-label={dialog.title}>
+        <div className="pdt-dialog is-open" {...PDT_UNSTYLED} role="dialog" aria-modal="true" aria-label={dialog.title}>
           <div className="pdt-dialog-head">
             <h3 className="pdt-dialog-title">{dialog.title}</h3>
             <button type="button" className="pdt-dialog-close" onClick={() => setDialog(null)} aria-label="Close">
