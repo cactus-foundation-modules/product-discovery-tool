@@ -1,0 +1,118 @@
+{
+  "name": "product-discovery-tool",
+  "version": "0.1.0",
+  "tablePrefix": "pdt_",
+  "description": "A guided buying flow for the shop: shoppers pick what sort of thing they want, then what sort of that, then what matters to them, and the products narrow as they go. Every option says what it means, what it is best for and what to watch out for, with a like-for-like comparison of the ones beside it - so a shopper who does not know a cantilever frame from a panel end can still buy the right thing. Runs on the filters you already have, so nothing is set up twice.",
+  "publicRootSlug": {
+    "page": "./app/root/[slug]/page",
+    "claimImport": "./lib/root-slug",
+    "claimExport": "discoveryClaimsRootSlug"
+  },
+  "requiresCoreVersion": "0.5.1306",
+  "requiresModules": [
+    {
+      "name": "shop",
+      "minVersion": "0.1.377"
+    },
+    {
+      "name": "filters-for-shop",
+      "minVersion": "0.1.48"
+    }
+  ],
+  "permissions": [],
+  "settingsTabs": [
+    {
+      "id": "product-discovery-tool",
+      "label": "Product Discovery",
+      "permission": "shop.manage",
+      "host": "shop.settings-sub-tabs",
+      "import": "./components/SettingsTab",
+      "component": "ProductDiscoverySettingsTab"
+    }
+  ],
+  "requiredEnvVars": [],
+  "cookieCategories": [],
+  "extensionPoints": [
+    {
+      "point": "shop.products-tabs",
+      "id": "product-discovery-tool",
+      "label": "Product Discovery",
+      "order": 42,
+      "permission": "shop.products",
+      "import": "./components/admin/DiscoveryTab",
+      "component": "DiscoveryTab"
+    },
+    {
+      "point": "core.menu-entity-provider",
+      "id": "product-discovery-tool",
+      "import": "./lib/menu-entity-provider",
+      "component": "discoveryMenuEntityProvider"
+    },
+    {
+      "point": "core.media-reference-rewriters",
+      "id": "product-discovery-tool",
+      "import": "./lib/media-reference-rewriter",
+      "component": "discoveryMediaReferenceRewriter"
+    },
+    {
+      "point": "core.media-usage-providers",
+      "id": "product-discovery-tool",
+      "import": "./lib/media-usage-provider",
+      "component": "discoveryMediaUsageProvider"
+    }
+  ],
+  "puckBlocks": [
+    {
+      "type": "ProductDiscovery",
+      "import": "./components/puck/ProductDiscovery",
+      "component": "productDiscoveryPuckComponent",
+      "rscComponent": "productDiscoveryPuckRscComponent",
+      "rscImport": "./components/puck/ProductDiscovery.rsc",
+      "layoutTypes": [
+        "productDiscovery"
+      ]
+    },
+    {
+      "type": "DiscoveryHeader",
+      "import": "./components/puck/DiscoveryHeader",
+      "component": "discoveryHeaderPuckComponent",
+      "rscComponent": "discoveryHeaderPuckRscComponent",
+      "rscImport": "./components/puck/DiscoveryHeader.rsc",
+      "layoutTypes": [
+        "productDiscovery"
+      ]
+    },
+    {
+      "type": "ProductDiscoveryLauncher",
+      "import": "./components/puck/ProductDiscoveryLauncher",
+      "component": "productDiscoveryLauncherPuckComponent",
+      "rscComponent": "productDiscoveryLauncherPuckRscComponent",
+      "rscImport": "./components/puck/ProductDiscoveryLauncher.rsc"
+    }
+  ],
+  "memberExtensions": {
+    "activityTypes": [],
+    "notificationCategories": [],
+    "routeTiers": []
+  },
+  "teardown": [
+    "pdt_stats",
+    "pdt_option_notes",
+    "pdt_questions",
+    "pdt_node_filters",
+    "pdt_nodes",
+    "pdt_flows",
+    "pdt_settings"
+  ],
+  "layoutTypes": {
+    "groupLabel": "Product Discovery",
+    "types": [
+      {
+        "key": "productDiscovery",
+        "label": "Guided flow page",
+        "starterImport": "./lib/starterLayouts",
+        "starterExport": "productDiscoveryStarters"
+      }
+    ]
+  }
+}
