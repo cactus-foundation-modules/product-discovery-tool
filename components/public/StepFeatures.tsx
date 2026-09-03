@@ -35,7 +35,6 @@ export function StepFeatures({
   selected,
   showCounts,
   startCollapsed = false,
-  collapseSignal = 0,
   onToggle,
   onExplain,
   onCompare,
@@ -53,11 +52,6 @@ export function StepFeatures({
    *  next closes it - while open by default is a panel, where closing one to
    *  read another would be a nuisance. */
   startCollapsed?: boolean
-  /** Bumped by the shell to shut everything again: the questions have just
-   *  stuck to the top of the window, and an open one there would cover the
-   *  products the shopper scrolled down to see. A counter rather than a
-   *  boolean, because what matters is the moment it happens, not the state. */
-  collapseSignal?: number
   onToggle: (groupId: string, filterId: string, multi: boolean) => void
   onExplain: (groupId: string, filterId: string) => void
   onCompare: (groupId: string) => void
@@ -68,19 +62,6 @@ export function StepFeatures({
   // already on screen, and so switching layouts never leaves a stale set
   // behind.
   const [toggled, setToggled] = useState<Set<string>>(new Set())
-
-  // Every bump shuts the lot. Only ever sent where shut is the resting state,
-  // so there is no layout in which this flings questions open.
-  //
-  // Adjusted during render rather than in an effect - React's own pattern for
-  // state that has to follow a change in props, and the one the shell uses to
-  // reset its result window. An effect would paint the open question once more
-  // before shutting it, which is exactly the flicker this is here to avoid.
-  const [lastCollapseSignal, setLastCollapseSignal] = useState(collapseSignal)
-  if (collapseSignal !== lastCollapseSignal) {
-    setLastCollapseSignal(collapseSignal)
-    setToggled(new Set())
-  }
 
   const primary = questions.filter((q) => q.importance === 'PRIMARY')
   const secondary = questions.filter((q) => q.importance === 'SECONDARY')

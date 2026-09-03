@@ -118,32 +118,25 @@ describe('discovery stylesheet', () => {
       .toContain('repeat(auto-fit,minmax(min(100%,')
   })
 
-  it('sticks the question bar at a movable offset, and grounds it only once stuck', () => {
+  it('brings the shopper back to the questions rather than pinning them', () => {
     const desktop = mediaBlocks(css).filter((block) => block.condition.includes('min-width')).map((b) => b.body).join('')
     const bar = /\.pdt-features\.pdt-pos-top \.pdt-questions\{([^}]*)\}/.exec(desktop)?.[1] ?? ''
-    expect(bar).toContain('position:sticky')
-    // A site with a taller header moves this rather than editing the module.
-    expect(bar).toContain('top:var(--pdt-sticky-top,7rem)')
-    const stuck = /\.pdt-features\.pdt-pos-top \.pdt-questions\.is-stuck\{([^}]*)\}/.exec(desktop)?.[1] ?? ''
-    expect(stuck).toContain('background:')
-    // Padding cannot differ between the two: sticky keeps its space in the
-    // flow, so a box that changes size on sticking shunts the page under it.
-    expect(stuck).not.toContain('padding')
+    // Nothing pinned: the questions scroll away and a floating button fetches
+    // them back.
+    expect(bar).not.toContain('position:sticky')
+    // Without this the jump lands the questions under the site's own header.
+    expect(bar).toContain('scroll-margin-top:var(--pdt-sticky-top,7rem)')
+    const jump = /\.pdt-jump\{([^}]*)\}/.exec(css)?.[1] ?? ''
+    expect(jump).toContain('position:fixed')
+    expect(jump).toContain('top:var(--pdt-sticky-top,7rem)')
   })
 
-  it('lays the across-the-top step out as a block, not a one-column grid', () => {
-    // A grid item's containing block is its grid area, and a sticky box cannot
-    // travel outside its containing block - so the bar in row one of a two-row
-    // grid is pinned to its own height and never sticks to anything. Silent,
-    // untypeable, and the whole feature.
-    const desktop = mediaBlocks(css).filter((block) => block.condition.includes('min-width')).map((b) => b.body).join('')
-    expect(/\.pdt-features\.pdt-pos-top\{([^}]*)\}/.exec(desktop)?.[1] ?? '').toContain('display:block')
-  })
-
-  it('keeps the sticky sentinel out of the grid', () => {
-    // In flow it is a grid row of its own, and the gap around it pushes the
-    // questions down by the gap for a marker with no height and nothing to see.
-    expect(/\.pdt-sticky-sentinel\{([^}]*)\}/.exec(css)?.[1] ?? '').toContain('position:absolute')
+  it('draws no ring round the step heading', () => {
+    // The heading takes focus on every step change so the step is announced.
+    // Safari gives a programmatically focused element :focus-visible after an
+    // ordinary click, which boxed the heading and left it boxed.
+    const rule = /\.pdt-step-title:focus,\.pdt-step-title:focus-visible\{([^}]*)\}/.exec(css)?.[1] ?? ''
+    expect(rule).toBe('outline:none')
   })
 
   it('paints nothing behind the narrow-down button', () => {

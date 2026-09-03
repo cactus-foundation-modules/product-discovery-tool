@@ -526,56 +526,43 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
     return () => mq.removeEventListener('change', apply)
   }, [tabletBp])
 
-  // The questions across the top stick to the window as the shopper scrolls
-  // into the products, so the answers stay reachable from anywhere down the
-  // list. Two things follow from that, and both need to know the moment it
-  // happens rather than the fact of it:
+  // The questions across the top scroll away like anything else. Once they have
+  // gone, a "Narrow down" button - the same one a phone gets - floats at the top
+  // of the window and brings the shopper back to them.
   //
-  //  - an open question is shut, because a full-width one pinned to the top of
-  //    the window covers the products that were just scrolled to;
-  //  - the bar takes a background, because from that point on it is painting
-  //    over cards rather than over the page.
-  //
-  // Detected with a sentinel above the bar rather than by watching the scroll
-  // position: `position: sticky` has no event, and the sentinel leaving the top
-  // of the window IS the bar becoming stuck, at whatever offset the site's
-  // header happens to leave.
-  const stickySentinelRef = useRef<HTMLDivElement>(null)
+  // The panel itself is what is watched, with no sentinel and no offset
+  // arithmetic: not intersecting AND its bottom above the top of the window is
+  // exactly "the questions are off the screen", which is the only moment the
+  // button is worth showing. Below the fold reads as not intersecting too, and
+  // that is a page nobody has scrolled yet, which the bottom check rules out.
   const questionsPanelRef = useRef<HTMLDivElement>(null)
-  const [sentinelPassed, setSentinelPassed] = useState(false)
-  const [collapseSignal, setCollapseSignal] = useState(0)
-  const stuckLayout = questionsPosition === 'top' && !isSheet
-  // Derived, not stored: a layout that has no sticky bar is not stuck, whatever
-  // the last observation said, and re-observing corrects the flag on its own
-  // first callback when the bar comes back.
-  const questionsStuck = stuckLayout && sentinelPassed
+  const [questionsScrolledOff, setQuestionsScrolledOff] = useState(false)
+  const jumpLayout = questionsPosition === 'top' && !isSheet && step.kind === 'features'
+  // Derived, not stored: a layout with no floating button cannot be showing
+  // one, whatever the last observation said.
+  const showJump = jumpLayout && questionsScrolledOff
 
   useEffect(() => {
-    if (!stuckLayout || typeof IntersectionObserver === 'undefined') return
-    const sentinel = stickySentinelRef.current
+    if (!jumpLayout || typeof IntersectionObserver === 'undefined') return
     const panel = questionsPanelRef.current
-    if (!sentinel || !panel) return
-    // The offset the bar actually sticks at, read off the bar rather than
-    // guessed: it is whatever --pdt-sticky-top resolves to, which a site with a
-    // taller header is meant to change. Shrinking the observer's top edge by
-    // the same amount makes "the sentinel has left" mean "the bar has stuck",
-    // to the pixel - without it the bar would be pinned over the products for
-    // the height of the header before this noticed.
-    const offset = Math.max(0, Number.parseFloat(getComputedStyle(panel).top) || 0)
+    if (!panel) return
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (!entry) return
-        // Above the line, not merely outside it: a sentinel still below the
-        // fold is unobserved too, and that is a page nobody has scrolled yet.
-        const stuck = !entry.isIntersecting && entry.boundingClientRect.top <= offset
-        setSentinelPassed(stuck)
-        if (stuck) setCollapseSignal((n) => n + 1)
+        setQuestionsScrolledOff(!entry.isIntersecting && entry.boundingClientRect.bottom <= 0)
       },
-      { threshold: 0, rootMargin: `-${offset}px 0px 0px 0px` },
+      { threshold: 0 },
     )
-    observer.observe(sentinel)
+    observer.observe(panel)
     return () => observer.disconnect()
-  }, [stuckLayout, step.kind])
+  }, [jumpLayout])
+
+  const jumpToQuestions = useCallback(() => {
+    // scroll-margin-top on the panel keeps this from landing under the site's
+    // own header; it is CSS's own answer to the problem and a site with a
+    // taller header moves the same variable the button is offset by.
+    questionsPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [])
 
   // Arriving at step three on a phone or tablet can open the questions drawer
   // rather than waiting for a tap on "Narrow down".
@@ -914,11 +901,7 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
         />
       ) : (
         <div className={`pdt-features pdt-pos-${questionsPosition === 'top' ? 'top' : 'left'} pdt-opts-${drawerOptions === 'one-per-line' ? 'rows' : 'grid'}`}>
-          {/* The sticky sentinel. A zero-height marker rather than a measured
-              scroll position, and outside the bar so it scrolls away while the
-              bar stays put. */}
-          {stuckLayout && <div className="pdt-sticky-sentinel" ref={stickySentinelRef} aria-hidden />}
-          <div ref={questionsPanelRef} className={`pdt-questions${sheetOpen ? ' is-open' : ''}${questionsStuck ? ' is-stuck' : ''}`} {...PDT_UNSTYLED} role={isSheet ? 'dialog' : undefined} aria-modal={isSheet && sheetOpen ? true : undefined} aria-label="Narrow these down">
+          <div ref={questionsPanelRef} className={`pdt-questions${sheetOpen ? ' is-open' : ''}`} {...PDT_UNSTYLED} role={isSheet ? 'dialog' : undefined} aria-modal={isSheet && sheetOpen ? true : undefined} aria-label="Narrow these down">
             <div className="pdt-questions-head">
               <strong>Narrow these down</strong>
               <button type="button" className="pdt-dialog-close" onClick={() => setSheetOpen(false)} aria-label="Close">
@@ -933,8 +916,7 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
               showCounts={settings.showCounts}
               // Only across the top, and only where that layout is actually in
               // force: in the sheet the questions ARE the screen, so they open.
-              startCollapsed={stuckLayout}
-              collapseSignal={collapseSignal}
+              startCollapsed={questionsPosition === 'top' && !isSheet}
               onToggle={toggleFilter}
               onExplain={explainFilter}
               onCompare={compareGroup}
@@ -1020,6 +1002,14 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
               </div>
             )}
           </div>
+
+          {/* The wide-screen twin of the bar below: same button, same colours,
+              shown only once the questions have scrolled off the top. */}
+          {showJump && (
+            <button type="button" className="pdt-bar-btn pdt-jump" style={barButtonStyle} onClick={jumpToQuestions}>
+              Narrow down{selected.size > 0 ? ` (${[...selected.values()].reduce((n, s) => n + s.size, 0)})` : ''}
+            </button>
+          )}
 
           {/* One button, not two. The second used to say "See N products" and
               close the drawer, which is work the drawer's own close and the

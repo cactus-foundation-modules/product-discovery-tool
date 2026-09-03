@@ -99,15 +99,30 @@ export function ProductDiscovery(props: ProductDiscoveryProps) {
   return <DiscoverySkeleton columns={props.columns ?? 3} questionsPosition={props.questionsPosition === 'top' ? 'top' : 'left'} />
 }
 
+// Puck draws no label for a `custom` field - the render owns everything inside
+// the row - so a custom field that does not write its own arrives in the sidebar
+// as a control with nothing above it. That is how the card-layout dropdown came
+// to sit at the bottom of the panel saying only "Use shop default", with no clue
+// what it was for. Same shape as purchase-orders' own helper.
+const labelled = (label: string, control: React.ReactNode) => (
+  <div>
+    <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 500, color: 'var(--color-text)', marginBottom: '0.375rem' }}>
+      {label}
+    </label>
+    {control}
+  </div>
+)
+
+const FLOW_LABEL = 'Flow'
+
 const flowField = {
   type: 'custom' as const,
-  label: 'Flow',
+  label: FLOW_LABEL,
   // Narrower than Puck hands it: a custom field is called with the whole field
   // context and this one needs two of it. Safe in the parameter position, and
   // it keeps the block's own props honestly typed.
-  render: ({ value, onChange }: { value?: string; onChange: (value: string) => void }) => (
-    <FlowPickerField value={value} onChange={onChange} />
-  ),
+  render: ({ value, onChange }: { value?: string; onChange: (value: string) => void }) =>
+    labelled(FLOW_LABEL, <FlowPickerField value={value} onChange={onChange} />),
 }
 
 const colourField = (label: string) => ({
@@ -118,10 +133,13 @@ const colourField = (label: string) => ({
   ),
 })
 
+const LAYOUT_LABEL = 'Card layout'
+
 const layoutField = {
   type: 'custom' as const,
-  label: 'Card layout',
-  render: ({ value, onChange }: any) => <ShopLayoutPicker type="shopProductCard" value={value} onChange={onChange} />,
+  label: LAYOUT_LABEL,
+  render: ({ value, onChange }: any) =>
+    labelled(LAYOUT_LABEL, <ShopLayoutPicker type="shopProductCard" value={value} onChange={onChange} />),
 }
 
 export const productDiscoveryPuckComponent = {

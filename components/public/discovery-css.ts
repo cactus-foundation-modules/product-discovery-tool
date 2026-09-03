@@ -37,9 +37,15 @@ export function discoveryCss({ tabletBp, mobileBp }: Breakpoints): string {
 .pdt-back:focus-visible{outline:2px solid var(--color-primary);outline-offset:2px}
 
 .pdt-step-head{display:flex;flex-direction:column;gap:6px}
+/* The heading takes focus on every step change so a screen reader announces the
+   new step (see DiscoveryShell). It draws NO ring for it: this focus is the
+   page's doing, not the shopper's, and Safari hands a programmatically focused
+   element :focus-visible after an ordinary mouse click - which put a box around
+   "Which sort of desks?" and left it there. The heading is not tabbable, so
+   there is no keyboard journey through it to indicate; what a keyboard user
+   needs from the move is the announcement, and they still get it. */
 .pdt-step-title{margin:0;font-size:clamp(20px,2.6vw,28px);line-height:1.2;font-weight:600;color:var(--color-text)}
-.pdt-step-title:focus{outline:none}
-.pdt-step-title:focus-visible{outline:2px solid var(--color-primary);outline-offset:4px;border-radius:4px}
+.pdt-step-title:focus,.pdt-step-title:focus-visible{outline:none}
 .pdt-step-sub{margin:0;font-size:.9375rem;color:var(--color-text-muted);max-width:62ch}
 
 .pdt-chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
@@ -95,11 +101,7 @@ export function discoveryCss({ tabletBp, mobileBp }: Breakpoints): string {
 .pdt-skip:focus-visible{outline:2px solid var(--color-primary);outline-offset:2px}
 
 /* Features step --------------------------------------------------------- */
-.pdt-features{position:relative;display:grid;gap:28px;grid-template-columns:minmax(220px,280px) 1fr;align-items:start}
-/* Out of the grid entirely (see DiscoveryShell): in flow it would be a row of
-   its own, and the gap around it would push the questions down by 20px for a
-   marker nobody can see. */
-.pdt-sticky-sentinel{position:absolute;top:0;left:0;width:1px;height:0;pointer-events:none}
+.pdt-features{display:grid;gap:28px;grid-template-columns:minmax(220px,280px) 1fr;align-items:start}
 .pdt-questions{display:flex;flex-direction:column;gap:4px;min-width:0}
 .pdt-question{border:0;border-top:1px solid var(--color-border);margin:0;padding:14px 0 4px}
 .pdt-question:first-of-type{border-top:0}
@@ -214,17 +216,13 @@ export function discoveryCss({ tabletBp, mobileBp }: Breakpoints): string {
      height of the results beside it.) The gap becomes a margin with it. */
   .pdt-features.pdt-pos-top{display:block}
   .pdt-features.pdt-pos-top>.pdt-questions{margin-bottom:20px}
-  /* Sticky, so the answers stay reachable once the shopper is down among the
-     products. The offset is a variable a site with a taller header can move,
-     spelled the way filters' own sticky panel spells its own. z-index above the
-     cards it paints over and far below the dialogs. The padding is the same
-     stuck or not: sticky keeps its space in the flow, so changing the box's
-     size on stick would shunt the whole page. */
-  .pdt-features.pdt-pos-top .pdt-questions{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:10px;align-items:start;padding:10px 0 22px;border-bottom:1px solid var(--color-border);position:sticky;top:var(--pdt-sticky-top,7rem);z-index:5}
-  /* Only once it is actually over the products does it need a ground of its
-     own. The cap is for the case where the shopper opens a question while it is
-     pinned: a tall one would otherwise fill the window it is floating over. */
-  .pdt-features.pdt-pos-top .pdt-questions.is-stuck{background:var(--color-page-bg,var(--color-bg));box-shadow:0 8px 20px rgba(0,0,0,.10);max-height:78vh;overflow:auto;overscroll-behavior:contain}
+  /* Not sticky. The questions stay where they are and scroll away with
+     everything else; a floating "Narrow down" button appears when they have
+     gone and brings the shopper back to them (see .pdt-jump). scroll-margin-top
+     is what stops that jump landing them under the site's own fixed header, and
+     it is the variable a site with a taller header moves - spelled the way
+     filters' own sticky panel spells its own. */
+  .pdt-features.pdt-pos-top .pdt-questions{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:10px;align-items:start;padding:10px 0 22px;border-bottom:1px solid var(--color-border);scroll-margin-top:var(--pdt-sticky-top,7rem)}
   /* An open question takes the whole row and lays its options out across it -
      the same reading as the drawer on a tablet, for the same reason: a column
      230px wide leaves three quarters of the row empty. Only one is ever open
@@ -251,6 +249,12 @@ export function discoveryCss({ tabletBp, mobileBp }: Breakpoints): string {
 .pdt-bar-btn{appearance:none;border:1px solid var(--pdt-bar-btn-border,var(--color-border));background:var(--pdt-bar-btn-bg,var(--color-surface));border-radius:999px;padding:12px 18px;font:inherit;font-size:.9375rem;color:var(--pdt-bar-btn-fg,var(--color-text));cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.18)}
 .pdt-bar-btn:hover{border-color:var(--pdt-bar-btn-hover-border,var(--color-primary));background:var(--pdt-bar-btn-hover-bg,var(--color-primary-subtle));color:var(--pdt-bar-btn-hover-fg,var(--pdt-bar-btn-fg,var(--color-text)))}
 .pdt-bar-btn:focus-visible{outline:2px solid var(--color-primary);outline-offset:2px}
+/* The same button as the phone's, floated at the top of the window on a wide
+   screen once the questions have scrolled away. Fixed rather than sticky: it
+   belongs to the window, not to a box in the flow, and it has to clear the
+   site's own header - hence the same offset variable the jump uses. Under the
+   dialogs and their scrim, over everything else. */
+.pdt-jump{position:fixed;top:var(--pdt-sticky-top,7rem);left:50%;transform:translateX(-50%);z-index:6}
 
 @media (prefers-reduced-motion:reduce){
   .pdt-choice{transition:border-color .25s ease,background .25s ease}
