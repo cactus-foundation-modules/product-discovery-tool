@@ -77,7 +77,7 @@ export async function ProductDiscoveryRsc(props: ProductDiscoveryProps) {
   const { tagById, tagsById } = buildTagMaps(tags)
 
   const [{ matrix, combos, swaps }, fromPrices, shelfMemberSets] = await Promise.all([
-    getProductFilterMatches(productIds, groups, config.productUrlStyle),
+    getProductFilterMatches(productIds, groups),
     resolveCardFromPrices(productIds),
     // Every shelf any node in this flow names, resolved once. A node pointing at
     // a category deleted since comes back as an empty set, which is what makes

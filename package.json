@@ -1,6 +1,6 @@
 {
   "name": "cactus-module-product-discovery-tool",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "private": true,
   "description": "A guided buying flow for the Cactus shop: type, then sort, then features, with every option explained and compared. Built on the filters-for-shop vocabulary."
 }

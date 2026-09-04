@@ -23,7 +23,7 @@ Along the way:
 - a running summary of every answer, each one removable;
 - an option that would leave nothing is shown greyed with the reason, never quietly dropped;
 - if a combination reaches zero anyway, the nearest sets are offered - "6 without *Glass top*" - rather than a dead end;
-- results open with the matching options already chosen, so nobody answers the same question twice;
+- results open with the shopper's own answers already chosen - and nothing else - so nobody answers the same question twice;
 - two or three results can be put side by side with the features the flow asked about as the rows;
 - every answer is in the address, so back and forward work and a result set can be shared.
 

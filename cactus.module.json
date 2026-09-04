@@ -1,6 +1,6 @@
 {
   "name": "product-discovery-tool",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "tablePrefix": "pdt_",
   "description": "A guided buying flow for the shop: shoppers pick what sort of thing they want, then what sort of that, then what matters to them, and the products narrow as they go. Every option says what it means, what it is best for and what to watch out for, with a like-for-like comparison of the ones beside it - so a shopper who does not know a cantilever frame from a panel end can still buy the right thing. Runs on the filters you already have, so nothing is set up twice.",
   "publicRootSlug": {
@@ -16,7 +16,7 @@
     },
     {
       "name": "filters-for-shop",
-      "minVersion": "0.1.49"
+      "minVersion": "0.1.50"
     }
   ],
   "permissions": [],

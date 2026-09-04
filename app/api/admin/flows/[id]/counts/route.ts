@@ -28,7 +28,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const productIds = products.map((p) => p.id)
 
   const [{ matrix }, memberSets] = await Promise.all([
-    getProductFilterMatches(productIds, groups, config.productUrlStyle),
+    getProductFilterMatches(productIds, groups),
     loadShelfMembers(
       productIds,
       nodes

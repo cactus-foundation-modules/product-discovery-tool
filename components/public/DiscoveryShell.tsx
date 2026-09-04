@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { facetCount, matchesSelection, pickCombinationFilters, pickSwapFilters, pickVariationIndex, type FltMatrixEntry, type FltSelection } from '@/modules/filters-for-shop/lib/filter-logic'
+import { facetCount, matchesSelection, pickCombinationFilters, pickSwapFilters, type FltMatrixEntry, type FltSelection } from '@/modules/filters-for-shop/lib/filter-logic'
 import { applySelectionToParams, selectionFromParams } from '@/modules/filters-for-shop/lib/preselect'
 import { FLT_SORT_OPTIONS, FLT_SORT_RECOMMENDED_PARAM, isFltSortValue, sortProductIds, sortValueFromParam, type FltSortKey, type FltSortValue } from '@/modules/filters-for-shop/lib/sort'
 import { EMPTY_SWAP_INDEX, unpackSwaps, type FltSwapIndex } from '@/modules/filters-for-shop/lib/swap-pack'
-import { variationHref } from '@/modules/filters-for-shop/lib/variation-links'
+import { withOptionParams } from '@/modules/filters-for-shop/lib/option-param'
 import type { FltSwap } from '@/modules/filters-for-shop/lib/db/matching'
 import type { FltPublicGroup, FltVariationIndex } from '@/modules/filters-for-shop/components/public/FilterShell'
 import { answerAt, buildNodeTree, buildSteps, clearFrom, currentStepIndex, formatPickPath, parsePickPath, stepHeading, PICK_PARAM, walkPath, type PdtStep, type PdtTreeNode } from '@/modules/product-discovery-tool/lib/flow'
@@ -563,10 +563,14 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
   // that is a page nobody has scrolled yet, which the bottom check rules out.
   const questionsPanelRef = useRef<HTMLDivElement>(null)
   const [questionsScrolledOff, setQuestionsScrolledOff] = useState(false)
+  const [productsScrolledPast, setProductsScrolledPast] = useState(false)
   const jumpLayout = questionsPosition === 'top' && !isSheet && step.kind === 'features'
   // Derived, not stored: a layout with no floating button cannot be showing
-  // one, whatever the last observation said.
-  const showJump = jumpLayout && questionsScrolledOff
+  // one, whatever the last observation said. And a button offering to narrow
+  // down products that are no longer on the screen is offering nothing - on a
+  // home page with the flow as one block among many, it followed the shopper
+  // down through the rest of the page and sat over the footer.
+  const showJump = jumpLayout && questionsScrolledOff && !productsScrolledPast
 
   useEffect(() => {
     if (!jumpLayout || typeof IntersectionObserver === 'undefined') return
@@ -582,6 +586,35 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
     observer.observe(panel)
     return () => observer.disconnect()
   }, [jumpLayout])
+
+  // The other end of the same window. The grid is watched rather than the whole
+  // results column, because the last CARD is what the shopper means by the end
+  // of the products - the "see everything" link and whatever the page carries
+  // below it are not products to narrow.
+  //
+  // Same arithmetic as the panel above, the other way up: not intersecting AND
+  // its bottom past the top of the window is "the products have gone", while
+  // not intersecting with the bottom still below is a grid the shopper has not
+  // reached yet, which must not hide anything.
+  //
+  // Re-observed whenever the grid's contents change: fetched pages and filtered
+  // cards move its bottom edge, and an observer only reports the crossings it
+  // sees, so a stale observation could leave the button hidden over a grid that
+  // has since grown back under the window.
+  useEffect(() => {
+    if (!jumpLayout || typeof IntersectionObserver === 'undefined') return
+    const grid = gridRef.current
+    if (!grid) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry) return
+        setProductsScrolledPast(!entry.isIntersecting && entry.boundingClientRect.bottom <= 0)
+      },
+      { threshold: 0 },
+    )
+    observer.observe(grid)
+    return () => observer.disconnect()
+  }, [jumpLayout, windowIds, extraCards])
 
   const jumpToQuestions = useCallback(() => {
     // scroll-margin-top on the panel keeps this from landing under the site's
@@ -653,15 +686,14 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
       const swapList = pickSwapFilters(matched, chosen, orderedGroups)
         .map((id) => swaps.get(productId)?.get(id))
         .filter((s): s is FltSwap => s != null)
-      // The variation that answers every one of those choices at once, and where
-      // its page is. Without it the click followed the FIRST choice only, so a
-      // shopper who had answered three questions landed on a product page set to
-      // one of their answers and two variations' worth of somebody else's.
+      // What the click should carry: one chosen answer per question, as the
+      // option parameters that pick them. Only what the shopper actually
+      // answered - the rest of the product's options are still theirs to choose.
       const wanted = pickCombinationFilters(matched, chosen, orderedGroups)
-      const deepHref = variationHref(variations.links, productId, pickVariationIndex(combosByProduct.get(productId), wanted))
-      dressCard(el, swapList, settings.swapCardImages, settings.preselectOnClick, deepHref)
+      const params = wanted.map((id) => swaps.get(productId)?.get(id)?.param)
+      dressCard(el, swapList, settings.swapCardImages, settings.preselectOnClick, params)
     }
-  }, [windowIds, matrix, chosen, orderedGroups, swaps, combosByProduct, variations.links, settings.swapCardImages, settings.preselectOnClick, extraCards])
+  }, [windowIds, matrix, chosen, orderedGroups, swaps, settings.swapCardImages, settings.preselectOnClick, extraCards])
 
   // Re-order the cards in place for the chosen sort. Real DOM moves, not CSS
   // `order`: the cards carry links and carousel buttons, and a visual order
@@ -1114,15 +1146,15 @@ function sameKeys(a: Map<string, HTMLElement>, b: Map<string, HTMLElement>): boo
 }
 
 // Re-dress one card for the options the shopper has chosen: show the matching
-// variations' photos and point the link at a variation's own page, which opens
-// the parent product with that variation's options already chosen - so the
-// shopper does not answer the same questions twice.
+// variations' photos and put those answers on the link, so the product page
+// opens with them chosen and the shopper does not answer the same questions
+// twice.
 //
-// `deepHref` is the variation answering every choice at once; the first swap is
-// the fallback, and answers only the first. Answering one question out of three
-// is the version that shipped, and it is the worse failure of the two: a shopper
-// who has just told the flow three things lands on a page claiming they said
-// something else.
+// `params` is one option parameter per answered question, and NOTHING else. The
+// link used to be a variation's own address, which opens the product on that
+// variation's whole combination: a shopper who answered two questions landed on
+// a page that had also answered four more on their behalf, from whichever
+// variation happened to carry their two.
 //
 // Cards with shop's carousel island get the polite version: the allowed
 // variation ids go into `data-shop-media-sources` and a `shop:card-media-sources`
@@ -1130,12 +1162,14 @@ function sameKeys(a: Map<string, HTMLElement>, b: Map<string, HTMLElement>): boo
 // Writing the <img> src directly there would be undone by the island's next
 // render. Cards with a plain server-rendered <img> keep the direct swap, with
 // the originals parked in data attributes so unticking restores them exactly.
-function dressCard(el: HTMLElement, swapList: FltSwap[], swapImages: boolean, preselect: boolean, deepHref: string | null) {
+function dressCard(el: HTMLElement, swapList: FltSwap[], swapImages: boolean, preselect: boolean, params: ReadonlyArray<string | null | undefined>) {
   const primary = swapList[0] ?? null
   const link = el instanceof HTMLAnchorElement ? el : el.querySelector<HTMLAnchorElement>('a.shop-card-link')
   if (link && preselect) {
+    // The server-rendered address is parked on first touch, so a changed answer
+    // re-writes the parameters rather than stacking another set on top.
     if (link.dataset.pdtHref === undefined) link.dataset.pdtHref = link.getAttribute('href') ?? ''
-    link.setAttribute('href', deepHref ?? primary?.href ?? link.dataset.pdtHref)
+    link.setAttribute('href', withOptionParams(link.dataset.pdtHref, params))
   }
   if (!swapImages) return
   if (el.querySelector('.shop-card-media')) {
