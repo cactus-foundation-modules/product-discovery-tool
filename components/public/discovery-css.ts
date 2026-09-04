@@ -221,25 +221,30 @@ export function discoveryCss({ tabletBp, mobileBp }: Breakpoints): string {
      gone and brings the shopper back to them (see .pdt-jump). scroll-margin-top
      is what stops that jump landing them under the site's own fixed header, and
      it is the variable a site with a taller header moves - spelled the way
-     filters' own sticky panel spells its own. */
-  .pdt-features.pdt-pos-top .pdt-questions{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:10px;align-items:start;padding:10px 0 22px;border-bottom:1px solid var(--color-border);scroll-margin-top:var(--pdt-sticky-top,7rem)}
+     filters' own sticky panel spells its own.
+     Wrapped flex, not an auto-fit grid: equal tracks padded "Budget" out to the
+     width of "Frame or base colour" and left a field of empty pill. Each closed
+     question is now as wide as its own words, and max-width:100% keeps a long
+     one on the row rather than sending the page sideways. */
+  .pdt-features.pdt-pos-top .pdt-questions{display:flex;flex-direction:row;flex-wrap:wrap;gap:10px;align-items:start;padding:10px 0 22px;border-bottom:1px solid var(--color-border);scroll-margin-top:var(--pdt-sticky-top,7rem)}
   /* An open question takes the whole row and lays its options out across it -
-     the same reading as the drawer on a tablet, for the same reason: a column
-     230px wide leaves three quarters of the row empty. Only one is ever open
-     here (see StepFeatures), so this is one band, never a wall. */
-  .pdt-features.pdt-pos-top .pdt-question:not(.is-closed){grid-column:1/-1}
+     the same reading as the drawer on a tablet, for the same reason: a question
+     the width of its own title leaves three quarters of the row empty once it
+     is open. Only one is ever open here (see StepFeatures), so this is one
+     band, never a wall. */
+  .pdt-features.pdt-pos-top .pdt-question:not(.is-closed){flex:1 1 100%}
   .pdt-features.pdt-pos-top .pdt-question:not(.is-closed) .pdt-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,215px),1fr));gap:4px 20px;align-items:start}
   /* The panel's own label earns its place here: down the left the step heading
      is answer enough, but a bare row of controls above the products needs
      saying. The sheet's close button has nothing to close. */
-  .pdt-features.pdt-pos-top .pdt-questions-head{display:flex;grid-column:1/-1;align-items:center;padding:0;margin:0;border:0;font-size:.9375rem}
+  .pdt-features.pdt-pos-top .pdt-questions-head{display:flex;flex:1 1 100%;align-items:center;padding:0;margin:0;border:0;font-size:.9375rem}
   .pdt-features.pdt-pos-top .pdt-questions-head .pdt-dialog-close{display:none}
-  .pdt-features.pdt-pos-top .pdt-question{border:1px solid var(--color-border);border-radius:12px;background:var(--color-surface);padding:0;min-width:0}
+  .pdt-features.pdt-pos-top .pdt-question{flex:0 1 auto;max-width:100%;border:1px solid var(--color-border);border-radius:12px;background:var(--color-surface);padding:0;min-width:0}
   .pdt-features.pdt-pos-top .pdt-question-head{padding:11px 14px}
   .pdt-features.pdt-pos-top .pdt-question.is-closed .pdt-question-head{padding-bottom:11px}
   .pdt-features.pdt-pos-top .pdt-question-body{padding:0 14px 12px}
   .pdt-features.pdt-pos-top .pdt-options{padding-bottom:6px}
-  .pdt-features.pdt-pos-top .pdt-no-questions{grid-column:1/-1}
+  .pdt-features.pdt-pos-top .pdt-no-questions{flex:1 1 100%}
 }
 /* Every colour is a custom property with the module's own as the fallback, so a
    block that sets none looks exactly as it always did and one that sets some

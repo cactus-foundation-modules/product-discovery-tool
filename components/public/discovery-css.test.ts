@@ -59,12 +59,19 @@ describe('discovery stylesheet', () => {
     expect(outsideAnyMedia).not.toContain('pdt-pos-top')
   })
 
-  it('gives the question row a floor it can go under', () => {
-    // auto-fit with a bare minmax floor cannot shrink past that floor, so the
-    // track overflows the page and takes the grid sideways with it on a narrow
-    // window. The min() form is the fix, and it is easy to lose in an edit.
+  it('sizes each closed question to its own words', () => {
+    // Equal tracks padded the short questions out to the width of the longest
+    // one, which is a lot of empty pill. Wrapped flex with an auto basis is
+    // what makes a box as wide as its label and no wider.
     const row = /\.pdt-features\.pdt-pos-top \.pdt-questions\{([^}]*)\}/.exec(css)?.[1] ?? ''
-    expect(row).toContain('repeat(auto-fit,minmax(min(100%,')
+    expect(row).toContain('flex-wrap:wrap')
+    expect(row).not.toContain('grid-template-columns')
+    // A basis of auto is only half of it: without the cap a question whose
+    // title is longer than the row overflows the page and takes the layout
+    // sideways with it, which is the same defect the old grid floor guarded.
+    const box = /\.pdt-features\.pdt-pos-top \.pdt-question\{([^}]*)\}/.exec(css)?.[1] ?? ''
+    expect(box).toContain('flex:0 1 auto')
+    expect(box).toContain('max-width:100%')
   })
 
   it('changes a link\u2019s text on hover and nothing else', () => {
@@ -113,7 +120,7 @@ describe('discovery stylesheet', () => {
     // already has the width, and in the sidebar there is no row to span.
     const desktop = mediaBlocks(css).filter((block) => block.condition.includes('min-width'))
     const body = desktop.map((block) => block.body).join('')
-    expect(body).toContain('.pdt-features.pdt-pos-top .pdt-question:not(.is-closed){grid-column:1/-1}')
+    expect(body).toContain('.pdt-features.pdt-pos-top .pdt-question:not(.is-closed){flex:1 1 100%}')
     expect(/\.pdt-features\.pdt-pos-top \.pdt-question:not\(\.is-closed\) \.pdt-options\{([^}]*)\}/.exec(body)?.[1] ?? '')
       .toContain('repeat(auto-fit,minmax(min(100%,')
   })
