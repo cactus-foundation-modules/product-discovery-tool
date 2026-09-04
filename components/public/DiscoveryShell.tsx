@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { facetCount, matchesSelection, pickSwapFilters, type FltMatrixEntry, type FltSelection } from '@/modules/filters-for-shop/lib/filter-logic'
+import { facetCount, matchesSelection, pickCombinationFilters, pickSwapFilters, pickVariationIndex, type FltMatrixEntry, type FltSelection } from '@/modules/filters-for-shop/lib/filter-logic'
 import { applySelectionToParams, selectionFromParams } from '@/modules/filters-for-shop/lib/preselect'
 import { FLT_SORT_OPTIONS, FLT_SORT_RECOMMENDED_PARAM, isFltSortValue, sortProductIds, sortValueFromParam, type FltSortKey, type FltSortValue } from '@/modules/filters-for-shop/lib/sort'
 import { EMPTY_SWAP_INDEX, unpackSwaps, type FltSwapIndex } from '@/modules/filters-for-shop/lib/swap-pack'
+import { variationHref } from '@/modules/filters-for-shop/lib/variation-links'
 import type { FltSwap } from '@/modules/filters-for-shop/lib/db/matching'
 import type { FltPublicGroup, FltVariationIndex } from '@/modules/filters-for-shop/components/public/FilterShell'
 import { answerAt, buildNodeTree, buildSteps, clearFrom, currentStepIndex, formatPickPath, parsePickPath, stepHeading, PICK_PARAM, walkPath, type PdtStep, type PdtTreeNode } from '@/modules/product-discovery-tool/lib/flow'
@@ -313,6 +314,31 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
     () => groups.map((g) => ({ id: g.id, filterIds: g.filters.map((f) => f.id) })),
     [groups],
   )
+
+  /** Everything the shopper has chosen, browse steps included.
+   *
+   *  A type picked on step one is an answer as much as a tick on step three is:
+   *  choosing "Rivet Forge" as the sort of chair they want is choosing the
+   *  fabric, and the flow then never asks about it again because the choice is
+   *  already made. The cards have to answer BOTH - the photo they show and the
+   *  page a click opens - or the shopper is shown the fabric they asked for and
+   *  then handed a product page set to a different one.
+   *
+   *  Kept apart from `selected`, which is the shopper's own ticks and the only
+   *  thing the questions, the counts and the address may be driven by. A locked
+   *  filter is not a tick and must never be offered as one to untick. */
+  const chosen = useMemo<FltSelection>(() => {
+    if (lockedFilterIds.size === 0) return selected
+    const out: FltSelection = new Map(selected)
+    for (const group of groups) {
+      const locked = group.filters.filter((f) => lockedFilterIds.has(f.id)).map((f) => f.id)
+      if (locked.length === 0) continue
+      const set = new Set(out.get(group.id) ?? [])
+      for (const id of locked) set.add(id)
+      out.set(group.id, set)
+    }
+    return out
+  }, [selected, groups, lockedFilterIds])
 
   // ---- The address ------------------------------------------------------
   // Always `sort`: a filter group whose slug would collide with it has already
@@ -624,12 +650,18 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
       el.style.display = on ? '' : 'none'
       el.toggleAttribute('data-pdt-hidden', !on)
       if (!on) continue
-      const swapList = pickSwapFilters(matched, selected, orderedGroups)
+      const swapList = pickSwapFilters(matched, chosen, orderedGroups)
         .map((id) => swaps.get(productId)?.get(id))
         .filter((s): s is FltSwap => s != null)
-      dressCard(el, swapList, settings.swapCardImages, settings.preselectOnClick)
+      // The variation that answers every one of those choices at once, and where
+      // its page is. Without it the click followed the FIRST choice only, so a
+      // shopper who had answered three questions landed on a product page set to
+      // one of their answers and two variations' worth of somebody else's.
+      const wanted = pickCombinationFilters(matched, chosen, orderedGroups)
+      const deepHref = variationHref(variations.links, productId, pickVariationIndex(combosByProduct.get(productId), wanted))
+      dressCard(el, swapList, settings.swapCardImages, settings.preselectOnClick, deepHref)
     }
-  }, [windowIds, matrix, selected, orderedGroups, swaps, settings.swapCardImages, settings.preselectOnClick, extraCards])
+  }, [windowIds, matrix, chosen, orderedGroups, swaps, combosByProduct, variations.links, settings.swapCardImages, settings.preselectOnClick, extraCards])
 
   // Re-order the cards in place for the chosen sort. Real DOM moves, not CSS
   // `order`: the cards carry links and carousel buttons, and a visual order
@@ -1081,10 +1113,16 @@ function sameKeys(a: Map<string, HTMLElement>, b: Map<string, HTMLElement>): boo
   return true
 }
 
-// Re-dress one card for the ticked options: show the matching variations'
-// photos and point the link at the first match's own page, which opens the
-// parent product with those options already chosen - so the shopper does not
-// answer the same questions twice.
+// Re-dress one card for the options the shopper has chosen: show the matching
+// variations' photos and point the link at a variation's own page, which opens
+// the parent product with that variation's options already chosen - so the
+// shopper does not answer the same questions twice.
+//
+// `deepHref` is the variation answering every choice at once; the first swap is
+// the fallback, and answers only the first. Answering one question out of three
+// is the version that shipped, and it is the worse failure of the two: a shopper
+// who has just told the flow three things lands on a page claiming they said
+// something else.
 //
 // Cards with shop's carousel island get the polite version: the allowed
 // variation ids go into `data-shop-media-sources` and a `shop:card-media-sources`
@@ -1092,12 +1130,12 @@ function sameKeys(a: Map<string, HTMLElement>, b: Map<string, HTMLElement>): boo
 // Writing the <img> src directly there would be undone by the island's next
 // render. Cards with a plain server-rendered <img> keep the direct swap, with
 // the originals parked in data attributes so unticking restores them exactly.
-function dressCard(el: HTMLElement, swapList: FltSwap[], swapImages: boolean, preselect: boolean) {
+function dressCard(el: HTMLElement, swapList: FltSwap[], swapImages: boolean, preselect: boolean, deepHref: string | null) {
   const primary = swapList[0] ?? null
   const link = el instanceof HTMLAnchorElement ? el : el.querySelector<HTMLAnchorElement>('a.shop-card-link')
   if (link && preselect) {
     if (link.dataset.pdtHref === undefined) link.dataset.pdtHref = link.getAttribute('href') ?? ''
-    link.setAttribute('href', primary ? primary.href : link.dataset.pdtHref)
+    link.setAttribute('href', deepHref ?? primary?.href ?? link.dataset.pdtHref)
   }
   if (!swapImages) return
   if (el.querySelector('.shop-card-media')) {

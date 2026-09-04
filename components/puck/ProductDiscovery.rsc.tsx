@@ -10,7 +10,7 @@ import { listGroups } from '@/modules/filters-for-shop/lib/db/filters'
 import { getProductFilterMatches } from '@/modules/filters-for-shop/lib/db/matching'
 import { applyPriceBands, internVariations, offerGroups } from '@/modules/filters-for-shop/lib/grid-build'
 import { packSwaps } from '@/modules/filters-for-shop/lib/swap-pack'
-import { matchesSelection } from '@/modules/filters-for-shop/lib/filter-logic'
+import { comboFilterIds, matchesSelection } from '@/modules/filters-for-shop/lib/filter-logic'
 import { sortProductIds, sortValueFromParam, type FltSortKey } from '@/modules/filters-for-shop/lib/sort'
 import { getFlowBySlug } from '@/modules/product-discovery-tool/lib/db/flows'
 import { listNodes } from '@/modules/product-discovery-tool/lib/db/nodes'
@@ -153,7 +153,7 @@ export async function ProductDiscoveryRsc(props: ProductDiscoveryProps) {
   let eligible: string[] = orderedIds
   for (const node of resolved.nodes) eligible = narrowByNode(eligible, node, shelfLookup, matchesAll)
   const renderIds = eligible
-    .filter((id) => matchesSelection(matrix.get(id) ?? [], new Map(), combos.get(id)))
+    .filter((id) => matchesSelection(matrix.get(id) ?? [], new Map(), comboFilterIds(combos.get(id))))
     .slice(0, pageSize)
 
   const productById = new Map(products.map((product) => [product.id, product]))
