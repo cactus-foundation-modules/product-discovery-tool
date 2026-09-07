@@ -181,7 +181,7 @@ export function discoveryCss({ tabletBp, mobileBp }: Breakpoints): string {
      above and below the button wherever the section behind it was any other
      shade. The button carries a shadow instead, which is what lifts it off the
      products it now floats over. */
-  .pdt-bar{display:flex;position:sticky;bottom:0;z-index:5;gap:10px;padding:10px 0;background:none;border:0}
+  .pdt-bar{display:flex;position:sticky;bottom:var(--cactus-bottom-bar-offset, 0px);z-index:5;gap:10px;padding:10px 0;background:none;border:0}
   .pdt-bar button{flex:1 1 auto}
   /* A tablet's drawer is the full width of the screen, and one tick per line
      leaves three quarters of every row empty. Side by side, the same question
