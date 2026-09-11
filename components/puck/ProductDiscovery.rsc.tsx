@@ -26,6 +26,7 @@ import { loadDiscoveryCards } from '@/modules/product-discovery-tool/lib/cards-a
 import { DiscoveryShell } from '@/modules/product-discovery-tool/components/public/DiscoveryShell'
 import { discoveryCss } from '@/modules/product-discovery-tool/components/public/discovery-css'
 import { productDiscoveryPuckComponent, type ProductDiscoveryProps } from './ProductDiscovery'
+import { SharedStyle } from '@/components/SharedStyle'
 
 // Server (RSC) half of Discovery: Guided Flow.
 //
@@ -173,7 +174,8 @@ export async function ProductDiscoveryRsc(props: ProductDiscoveryProps) {
 
   return (
     <>
-      <style dangerouslySetInnerHTML={{ __html: shopCardCss(bp) + discoveryCss(bp) }} />
+      <SharedStyle id="shop-cards" css={shopCardCss(bp)} />
+      <SharedStyle id="discovery" css={discoveryCss(bp)} />
       <DiscoveryShell
         flowSlug={flow.slug}
         allowSkip={flow.allowSkip}
