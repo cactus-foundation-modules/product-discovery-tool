@@ -12,10 +12,16 @@ import { PDT_UNSTYLED } from '@/modules/product-discovery-tool/lib/types'
 // filed under is a configuration gap, not a choice worth explaining - which is
 // the opposite call from the features step, where a dead option is shown with
 // its reason because there the shopper's own answers caused it.
+//
+// A count of NULL is a third case and means "not counted yet", not "none": the
+// answer set arrives after the first paint, and a tile whose number is not in
+// yet is shown without one. It must never be filtered out - reading null as
+// zero here would blank the whole first step until the fetch landed, which is
+// the one thing the deferral must not do.
 
 export type PdtBrowseOption = {
   node: PdtTreeNode
-  count: number
+  count: number | null
 }
 
 // Layout, not passive: the foot moves between the gap at the end of the last
@@ -71,7 +77,7 @@ export function StepBrowse({
 }) {
   const gridRef = useRef<HTMLFieldSetElement>(null)
   const columns = useGridColumns(gridRef)
-  const live = options.filter((option) => option.count > 0)
+  const live = options.filter((option) => option.count === null || option.count > 0)
   const hasFoot = canCompare || allowSkip
   // A gap at the end of the last row is the natural home for the two buttons:
   // they fill the hole instead of pushing the page down for a row of their own.
@@ -113,7 +119,7 @@ export function StepBrowse({
                 <span className="pdt-choice-body">
                   <span className="pdt-choice-label">{node.label}</span>
                   {node.blurb && <span className="pdt-choice-blurb">{node.blurb}</span>}
-                  {showCounts && (
+                  {showCounts && count !== null && (
                     <span className="pdt-choice-count">{count} {count === 1 ? 'product' : 'products'}</span>
                   )}
                 </span>

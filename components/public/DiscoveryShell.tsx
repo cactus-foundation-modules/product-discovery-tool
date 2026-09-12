@@ -20,6 +20,7 @@ import { StepBrowse } from '@/modules/product-discovery-tool/components/public/S
 import { StepFeatures, type PdtQuestionView } from '@/modules/product-discovery-tool/components/public/StepFeatures'
 import { CompareTable } from '@/modules/product-discovery-tool/components/public/CompareTable'
 import { AnswerChips, type PdtAnswerChip } from '@/modules/product-discovery-tool/components/public/AnswerChips'
+import type { PdtDatasetWire } from '@/modules/product-discovery-tool/lib/dataset-wire'
 
 // The guided flow, in the browser.
 //
@@ -60,17 +61,39 @@ export type DiscoveryShellProps = {
    *  offerGroups and with their query-string keys already resolved (a group
    *  whose slug collides with `pick`, `sort` or `page` arrives under `q-`). */
   groups: FltPublicGroup[]
-  matrix: Record<string, string[]>
-  variations: FltVariationIndex
-  swaps: FltSwapIndex
-  sortKeys: Record<string, FltSortKey>
-  /** The shop's own order of every product in the flow's scope. The index into
-   *  this array is how shelf membership is spelled on the wire. */
-  serverOrder: string[]
-  /** shelfKey -> indexes into serverOrder. Interned because a catalogue-wide
-   *  flow with thirty nodes would otherwise carry the same product ids over and
-   *  over. */
-  shelfMembers: Record<string, number[]>
+  /** The flow's answer set, FETCHED rather than serialised into the page.
+   *
+   *  Measured on the live homepage, spelling this into the HTML cost 660 KB of
+   *  flight payload per view - a 214 KB match matrix, 241 KB of swaps, 119 KB of
+   *  interned combinations and 71 KB of sort keys - and the large majority of
+   *  visitors never touch the finder. So the block hands over `datasetHref` and
+   *  the counts for the first step, and this arrives once, from a route a CDN
+   *  holds for everybody.
+   *
+   *  Everything the shopper can do BEFORE it lands is drawn by the server: the
+   *  first step's tiles with their counts, and page one of the results. Until it
+   *  arrives the shell leaves all of that exactly as served - see `ready`. */
+  datasetHref: string
+  /** The counts for the FIRST step's tiles, worked out by the server out of the
+   *  same pass that chose the cards.
+   *
+   *  This is the one part of the answer that cannot wait: a browse tile without
+   *  its count is a tile that has to be redrawn, and the one-pass bargain says
+   *  the number on a tile and the products behind it are the same answer. It is
+   *  one integer per option, so it costs nothing to send. */
+  initialCounts: Record<string, number>
+  /** How many products the server's own state matches.
+   *
+   *  The toolbar and the empty state both read the match count, and before the
+   *  answer set lands the shell's own count is zero - which on a link straight
+   *  to the features step (`?pick=` plus a chosen feature) would read "0
+   *  products. Nothing matches all of that." for as long as the fetch took, on a
+   *  step whose cards are sitting on screen underneath. This is the same number,
+   *  from the same pass, so the page says the truth from the first frame. */
+  initialMatchCount: number
+  /** Handed in only by a caller that already has the set - the tests, and a
+   *  future caller with no round trip to make. Normally absent. */
+  dataset?: PdtDatasetWire | null
   columns: number
   pageSize: number
   /** Where step three's questions sit on a wide screen: down the left of the
@@ -109,6 +132,13 @@ export type DiscoveryShellProps = {
 }
 
 const EMPTY_VARIATIONS: FltVariationIndex = { filterIds: [], combos: [], byProduct: {} }
+// Frozen module-level singletons on purpose: every memo below lists these in its
+// dependency array, and a fresh `{}` per render would invalidate all of them on
+// every render for as long as the fetch is in flight.
+const EMPTY_MATRIX: Record<string, string[]> = {}
+const EMPTY_SORT_KEYS: Record<string, FltSortKey> = {}
+const EMPTY_ORDER: string[] = []
+const EMPTY_SHELF_MEMBERS: Record<string, number[]> = {}
 
 // Same rule, and the same hard-won reason, as FilterShell's: every pass that
 // writes to the cards must run in the SAME phase, because React runs all layout
@@ -129,10 +159,23 @@ const MAX_PRODUCT_COMPARE = 3
 export function DiscoveryShell(props: DiscoveryShellProps) {
   const {
     flowSlug, allowSkip, finishCta, headings, settings, nodes, questions, notes, groups,
-    matrix, variations = EMPTY_VARIATIONS, swaps: swapIndex = EMPTY_SWAP_INDEX, sortKeys,
-    serverOrder, shelfMembers, columns, pageSize, questionsPosition, autoOpenQuestions, drawerOptions,
+    datasetHref, initialCounts, initialMatchCount, columns, pageSize, questionsPosition, autoOpenQuestions, drawerOptions,
     firstStepFoot, defaultSort, barButton, tabletBp, initialPick, renderedIds, loadCards, children,
   } = props
+
+  // The fetched answer set, and everything read off it.
+  //
+  // Null until it lands, which is the state the first paint is in. Every
+  // derivation below reads these, so the arithmetic is written once and does not
+  // care where the numbers came from - what changes is `ready`, which holds the
+  // grid passes off until there is something to say.
+  const [dataset, setDataset] = useState<PdtDatasetWire | null>(props.dataset ?? null)
+  const matrix = dataset?.matrix ?? EMPTY_MATRIX
+  const variations = dataset?.variations ?? EMPTY_VARIATIONS
+  const swapIndex = dataset?.swaps ?? EMPTY_SWAP_INDEX
+  const sortKeys = dataset?.sortKeys ?? EMPTY_SORT_KEYS
+  const serverOrder = dataset?.serverOrder ?? EMPTY_ORDER
+  const shelfMembers = dataset?.shelfMembers ?? EMPTY_SHELF_MEMBERS
 
   const gridRef = useRef<HTMLDivElement>(null)
   const headingRef = useRef<HTMLHeadingElement>(null)
@@ -149,6 +192,44 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
   const [comparePicks, setComparePicks] = useState<string[]>([])
   const [slots, setSlots] = useState<Map<string, HTMLElement>>(new Map())
   const [urlRead, setUrlRead] = useState(false)
+
+  // Everything the shell does to the grid waits for BOTH the address and the
+  // answer set. Before that the page is exactly what the server sent - the first
+  // step's tiles with their counts, and page one of the results - and leaving it
+  // alone is the whole trick: no flash of an empty grid, no cards hidden and put
+  // back, nothing moving under the shopper's hand.
+  const ready = urlRead && dataset !== null
+
+
+  // Fetched once, as soon as the shell mounts rather than on first click: by the
+  // time anybody has read the first question it has usually arrived, so engaging
+  // with the flow still feels immediate. Failure is quiet on purpose - the
+  // server's own first step and first page stay on screen, which is a working
+  // page rather than an error - and a retry costs one more request.
+  const wantedDataset = props.dataset == null
+  useEffect(() => {
+    if (!wantedDataset) return
+    let live = true
+    const run = () => {
+      fetch(datasetHref, { headers: { accept: 'application/json' } })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((json: PdtDatasetWire | null) => {
+          if (live && json && typeof json === 'object' && json.matrix) setDataset(json)
+        })
+        .catch(() => {})
+    }
+    // After paint, so parsing it never lands in front of the first frame. The
+    // timeout is the ceiling rather than the plan: an idle moment almost always
+    // comes first, and a page that never goes idle should not leave the finder
+    // inert for ever.
+    const idler = window.requestIdleCallback
+    const id = typeof idler === 'function' ? idler(run, { timeout: 1500 }) : window.setTimeout(run, 0)
+    return () => {
+      live = false
+      if (typeof idler === 'function') window.cancelIdleCallback(id)
+      else window.clearTimeout(id)
+    }
+  }, [wantedDataset, datasetHref])
   const [notFound, setNotFound] = useState(false)
   // Whether the shopper has moved at all since the page loaded. Focus is only
   // taken to the step heading once they have - moving it on first paint would
@@ -216,9 +297,17 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
   const browseOptions = useMemo(() => {
     if (step.kind !== 'browse') return []
     const parentChain = step.parent ? walkPath(roots, path.slice(0, step.index)).nodes : []
+    // Before the answer set lands the counts are the server's own, out of the
+    // same pass that chose the cards - so the tile says the same number it would
+    // have said, and says it at first paint rather than after a round trip. A
+    // node the server did not count (it only counts the step it rendered) shows
+    // nothing rather than a wrong zero.
+    if (!ready) {
+      return step.options.map((node) => ({ node, count: initialCounts[node.id] ?? null }))
+    }
     const base = narrowTo(parentChain)
     return step.options.map((node) => ({ node, count: narrowByNode(base, node, shelfLookup, matchesAll).length }))
-  }, [step, roots, path, narrowTo, shelfLookup, matchesAll])
+  }, [step, roots, path, narrowTo, shelfLookup, matchesAll, ready, initialCounts])
 
   // ---- Filters: the matrix, the questions and the selection --------------
   const combosByProduct = useMemo(() => {
@@ -298,6 +387,12 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
     () => orderedIds.filter((id) => matchesSelection(matrix[id] ?? [], selected, combosByProduct.get(id))),
     [orderedIds, matrix, selected, combosByProduct],
   )
+  // What the page says it has matched. The shell's own figure once the answer
+  // set is in; the server's until then, because the cards on screen are the
+  // server's too, and two different numbers for one grid is worse than a late
+  // one.
+  const matchCount = ready ? matchingIds.length : initialMatchCount
+
   const windowIds = useMemo(() => matchingIds.slice(0, Math.max(pageSize, shownLimit)), [matchingIds, pageSize, shownLimit])
 
   // Back to the top of the list whenever the answers change. Adjusted during
@@ -439,14 +534,17 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
   // what this answers.
   const deadRef = useRef('')
   useEffect(() => {
-    if (!urlRead || step.kind !== 'features') return
+    // `ready` rather than `urlRead`: before the answer set lands every
+    // combination looks like a dead end, and recording that would put a false
+    // count against whichever options the shopper happened to arrive with.
+    if (!ready || step.kind !== 'features') return
     if (matchingIds.length > 0 || selected.size === 0) return
     const refs = chosenRefs(groups, selected)
     const key = refs.join(',')
     if (deadRef.current === key) return
     deadRef.current = key
     for (const ref of refs) beacon('features', ref, 'DEAD_END')
-  }, [urlRead, step.kind, matchingIds.length, selected, groups, beacon])
+  }, [ready, step.kind, matchingIds.length, selected, groups, beacon])
 
   // ---- Moving through the flow ------------------------------------------
   const goTo = useCallback(
@@ -642,7 +740,7 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
   }, [step.kind, autoOpenQuestions, isSheet])
 
   useEffect(() => {
-    if (!urlRead) return
+    if (!ready) return
     const missing = windowIds.filter((id) => !loadedIdsRef.current.has(id)).slice(0, Math.max(1, Math.floor(pageSize) || 1))
     if (missing.length === 0) return
     const key = missing.join(',')
@@ -668,13 +766,18 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
       })
     // cardRetry is in the list on purpose and read nowhere: it is how the retry
     // button asks again for a window that has not otherwise changed.
-  }, [urlRead, windowIds, pageSize, loadCards, extraCards, cardRetry])
+  }, [ready, windowIds, pageSize, loadCards, extraCards, cardRetry])
 
   // Show, hide and re-dress the server-rendered cards in place. Declared first
   // of the DOM passes; the paging pass below leaves anything this hid alone.
   useIsomorphicLayoutEffect(() => {
     const root = gridRef.current
     if (!root) return
+    // Nothing to say until the answer set is in. Leaving the server's own cards
+    // untouched is the point of the gate: without it an empty matrix means an
+    // empty window, and this pass would hide every card on the page and then
+    // put them all back a moment later.
+    if (!ready) return
     const onPage = new Set(windowIds)
     for (const el of root.querySelectorAll<HTMLElement>('[data-pdt-product]')) {
       const productId = el.dataset.pdtProduct ?? ''
@@ -693,7 +796,7 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
       const params = wanted.map((id) => swaps.get(productId)?.get(id)?.param)
       dressCard(el, swapList, settings.swapCardImages, settings.preselectOnClick, params)
     }
-  }, [windowIds, matrix, chosen, orderedGroups, swaps, settings.swapCardImages, settings.preselectOnClick, extraCards])
+  }, [windowIds, matrix, chosen, orderedGroups, swaps, settings.swapCardImages, settings.preselectOnClick, extraCards, ready])
 
   // Re-order the cards in place for the chosen sort. Real DOM moves, not CSS
   // `order`: the cards carry links and carousel buttons, and a visual order
@@ -703,6 +806,11 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
   useIsomorphicLayoutEffect(() => {
     const root = gridRef.current
     if (!root) return
+    // Nothing to say until the answer set is in. Leaving the server's own cards
+    // untouched is the point of the gate: without it an empty matrix means an
+    // empty window, and this pass would hide every card on the page and then
+    // put them all back a moment later.
+    if (!ready) return
     const cards = new Map<string, HTMLElement>()
     for (const el of root.querySelectorAll<HTMLElement>(':scope > [data-pdt-product]')) {
       cards.set(el.dataset.pdtProduct ?? '', el)
@@ -713,7 +821,7 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
       if (el) frag.appendChild(el)
     }
     if (frag.childNodes.length > 0) root.appendChild(frag)
-  }, [windowIds, extraCards])
+  }, [windowIds, extraCards, ready])
 
   // Compare slots. Only made when compare mode is on, and appended to the card
   // rather than rendered into it: the cards are server-stamped Puck documents
@@ -721,6 +829,11 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
   useIsomorphicLayoutEffect(() => {
     const root = gridRef.current
     if (!root) return
+    // Nothing to say until the answer set is in. Leaving the server's own cards
+    // untouched is the point of the gate: without it an empty matrix means an
+    // empty window, and this pass would hide every card on the page and then
+    // put them all back a moment later.
+    if (!ready) return
     if (!compareMode) {
       for (const slot of root.querySelectorAll('.pdt-pick-slot')) slot.remove()
       setSlots((prev) => (prev.size === 0 ? prev : new Map()))
@@ -741,7 +854,7 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
       next.set(productId, slot)
     }
     setSlots((prev) => (sameKeys(prev, next) ? prev : next))
-  }, [compareMode, windowIds, extraCards])
+  }, [compareMode, windowIds, extraCards, ready])
 
   const toggleComparePick = useCallback((productId: string) => {
     setComparePicks((prev) => {
@@ -992,8 +1105,8 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
               {/* A live region, so a shopper using a screen reader hears the
                   list change as they tick rather than discovering it later. */}
               <p className="pdt-showing" role="status">
-                {matchingIds.length} {matchingIds.length === 1 ? 'product' : 'products'}
-                {selected.size > 0 && eligibleIds.length !== matchingIds.length ? ` of ${eligibleIds.length}` : ''}
+                {matchCount} {matchCount === 1 ? 'product' : 'products'}
+                {ready && selected.size > 0 && eligibleIds.length !== matchingIds.length ? ` of ${eligibleIds.length}` : ''}
               </p>
               <span style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                 {canCompareProducts && (
@@ -1029,7 +1142,7 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
               </div>
             )}
 
-            {matchingIds.length === 0 && (
+            {matchCount === 0 && (
               relaxOffers.length > 0 ? (
                 <div className="pdt-recovery" role="status" {...PDT_UNSTYLED}>
                   <p className="pdt-recovery-title">Nothing matches all of that.</p>
