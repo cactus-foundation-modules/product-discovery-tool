@@ -9,6 +9,7 @@ import { shopCardCss } from '@/modules/shop/components/puck/parts/card-parts'
 import { comboFilterIds, matchesSelection } from '@/modules/filters-for-shop/lib/filter-logic'
 import { sortValueFromParam } from '@/modules/filters-for-shop/lib/sort'
 import { getFlowBySlug } from '@/modules/product-discovery-tool/lib/db/flows'
+import { listNodes } from '@/modules/product-discovery-tool/lib/db/nodes'
 import { listQuestions } from '@/modules/product-discovery-tool/lib/db/questions'
 import { listNotes } from '@/modules/product-discovery-tool/lib/db/notes'
 import { getSettings } from '@/modules/product-discovery-tool/lib/db/settings'
@@ -21,6 +22,7 @@ import { DiscoveryShell } from '@/modules/product-discovery-tool/components/publ
 import { discoveryCss } from '@/modules/product-discovery-tool/components/public/discovery-css'
 import { productDiscoveryPuckComponent, type ProductDiscoveryProps } from './ProductDiscovery'
 import { SharedStyle } from '@/components/SharedStyle'
+import { CardGridSkeleton } from '@/components/CardGridSkeleton'
 import { findRenditionUrls } from '@/lib/media/rendition-lookup'
 import { THUMB_RENDITION_SUFFIX } from '@/lib/media/thumb-renditions'
 
@@ -100,25 +102,21 @@ async function ProductDiscoveryBody(props: ProductDiscoveryProps) {
   const columns = props.columns ?? 3
   const pageSize = Math.max(1, Math.min(100, Math.floor(flow.resultsPerPage) || 24))
 
-  // The flow's whole answer set, built by the same function the dataset route
-  // calls - so the numbers the server reasons over here and the numbers the
-  // browser fetches are the same numbers by construction. See lib/dataset.ts.
+  // THE CHEAP HALF, and it is the whole of the opening step.
   //
-  // It loads the flow's nodes, groups and tags on the way through, so this block
-  // takes them from the build rather than asking for them a second time.
-  const [built, config, bp, questions, notes, settings, template] = await Promise.all([
-    buildDiscoveryDataset(slug, props.defaultSort || 'best-selling'),
-    getShopConfigCached(),
+  // The flow's tree, its questions and its settings are small table reads. What
+  // is expensive is the pass over five hundred products - the match matrix, the
+  // prices, the ordering and the cards - and the opening step needs none of it.
+  // Splitting them is what lets "What are you looking for today?" arrive with the
+  // page instead of behind "Finding your options…": the shell and its first step
+  // render from these, and the product pass streams in underneath.
+  const [bp, nodes, questions, notes, settings] = await Promise.all([
     getShopBreakpoints(),
+    listNodes(flow.id),
     listQuestions(flow.id),
     listNotes(),
     getSettings(),
-    resolveCardTemplate(props.layoutRef),
   ])
-  if (!built) {
-    return <p style={{ color: 'var(--color-text-muted)' }}>There are no products to guide anyone through yet.</p>
-  }
-  const { products, matrix, combos, shelfMemberSets, orderedIds, nodes, flowShelves, groups: offered } = built
 
   // The browse pictures, at the size they are actually drawn.
   //
@@ -136,61 +134,19 @@ async function ProductDiscoveryBody(props: ProductDiscoveryProps) {
     : nodes
 
   const defaultSort = sortValueFromParam(props.defaultSort || 'best-selling') ?? ''
-
-  // What the SERVER should draw cards for: the first page of the state the
-  // address describes, worked out with the shell's own rules over the shell's
-  // own data, so the first paint is the linked-to step rather than a page of
-  // whatever happened to be first.
-  const roots = buildNodeTree(nodes)
   const path = parsePickPath(props.pick)
-  const resolved = resolveScope({ scopeType: 'ALL', scopeSlug: null }, roots, path)
-  const shelfLookup = (shelf: PdtShelf) => shelfMemberSets.get(shelfKey(shelf))
-  const matchesAll = (productId: string, filterIds: readonly string[]) => {
-    const matched = matrix.get(productId) ?? []
-    return filterIds.every((id) => matched.includes(id))
-  }
-  let eligible: string[] = orderedIds
-  for (const node of resolved.nodes) eligible = narrowByNode(eligible, node, shelfLookup, matchesAll)
-  const renderIds = eligible
-    .filter((id) => matchesSelection(matrix.get(id) ?? [], new Map(), comboFilterIds(combos.get(id))))
-    .slice(0, pageSize)
 
-  // The count behind every browse tile, so the FIRST step is complete at first
-  // paint while the answer set is still on its way.
-  //
-  // Every node in the flow rather than just the step being drawn: a node's count
-  // is measured against its own ancestors, which is well defined for all of
-  // them, and computing the lot means a shopper deep-linked to step three
-  // (`?pick=`) gets their tiles counted too. It is one integer per node - about
-  // seventy on the live flow - against the 660 KB this replaces.
-  //
-  // Measured over the same matrix the cards came out of, which is the one-pass
-  // bargain kept: the number on a tile and the products behind it are the same
-  // answer, not two answers that agree.
-  const initialCounts: Record<string, number> = {}
-  const countFrom = (chain: readonly PdtTreeNode[], node: PdtTreeNode) => {
-    let ids: string[] = orderedIds
-    for (const step of chain) ids = narrowByNode(ids, step, shelfLookup, matchesAll)
-    return narrowByNode(ids, node, shelfLookup, matchesAll).length
-  }
-  const walkCounts = (siblings: readonly PdtTreeNode[], chain: PdtTreeNode[]) => {
-    for (const node of siblings) {
-      initialCounts[node.id] = countFrom(chain, node)
-      if (node.children.length > 0) walkCounts(node.children, [...chain, node])
-    }
-  }
-  walkCounts(roots, [])
+  // The flow's own shelf chain, worked out from the flow row rather than from
+  // the product pass - it is what the flow can ever reach, before a single
+  // answer, and needs no products to know.
+  const flowShelves: PdtShelf[] = flow.scopeType !== 'ALL' && flow.scopeSlug
+    ? [{ type: flow.scopeType, slug: flow.scopeSlug }]
+    : []
 
   // The dataset's own address. `sort` rides along because `serverOrder` has to
-  // match the order the cards below were drawn in; the CDN keys on the whole
-  // query string, so two flows, or one flow ordered two ways, cache separately
-  // and correctly.
+  // match the order the cards were drawn in; the CDN keys on the whole query
+  // string, so two flows, or one flow ordered two ways, cache separately.
   const datasetHref = `/api/m/product-discovery-tool/public/dataset?flow=${encodeURIComponent(slug)}&sort=${encodeURIComponent(props.defaultSort || 'best-selling')}`
-
-  const productById = new Map(products.map((product) => [product.id, product]))
-  const items = await buildGridCardItems(renderIds.map((id) => productById.get(id)).filter((p): p is (typeof products)[number] => p != null))
-  // The opening row loads its pictures eagerly; the rest of the shelf stays lazy.
-  const cards = await renderDiscoveryCards(template, items, config.productUrlStyle, columns)
 
   return (
     <>
@@ -206,17 +162,12 @@ async function ProductDiscoveryBody(props: ProductDiscoveryProps) {
         nodes={drawnNodes}
         questions={questions}
         notes={notes}
-        groups={offered}
-        // The answer set is FETCHED, not inlined. This is the whole of what
-        // used to be 660 KB of flight payload on every view of this page: the
-        // match matrix, the swaps, the interned combinations and the sort keys.
-        // See lib/dataset.ts for why, and app/api/public/dataset for where.
+        // The answer set is FETCHED, not inlined - 660 KB of flight payload on
+        // every view of this page, for a block most visitors never touch. The
+        // culled question groups and the tile counts travel with it, because
+        // both are measured against the match matrix and neither is wanted on
+        // the opening step. See lib/dataset.ts.
         datasetHref={datasetHref}
-        // What the first step needs in the meantime, and nothing more.
-        initialCounts={initialCounts}
-        // The same pass's answer for the state the address describes, so the
-        // toolbar and the empty state never contradict the cards below them.
-        initialMatchCount={eligible.length}
         columns={columns}
         pageSize={pageSize}
         questionsPosition={props.questionsPosition === 'top' ? 'top' : 'left'}
@@ -235,7 +186,6 @@ async function ProductDiscoveryBody(props: ProductDiscoveryProps) {
         defaultSort={defaultSort}
         tabletBp={bp.tabletBp}
         initialPick={path.join('/')}
-        renderedIds={renderIds}
         // Bound here, so what the browser may ask for is a list of ids off a
         // list the server drew up. The server function re-runs the flow's own
         // authorising query regardless.
@@ -246,10 +196,56 @@ async function ProductDiscoveryBody(props: ProductDiscoveryProps) {
           maxCards: pageSize,
         })}
       >
-        {cards}
+        {/* THE EXPENSIVE HALF, under its own boundary so it cannot hold up the
+            step above it. Everything the shopper can do before it lands - read
+            the question, pick a type - is already on screen and already works;
+            the results grid fills in underneath. */}
+        <Suspense fallback={<CardGridSkeleton columns={columns} count={Math.min(pageSize, columns * 2)} />}>
+          <DiscoveryCards {...props} slug={slug} pageSize={pageSize} columns={columns} />
+        </Suspense>
       </DiscoveryShell>
     </>
   )
+}
+
+// The flow's first page of cards, and the pass that decides which they are.
+//
+// Separate component purely so it can sit behind its own Suspense boundary: it
+// resolves every product the flow can reach, runs every filter over all of them,
+// prices them and orders them, and until now the opening question waited behind
+// all of that.
+async function DiscoveryCards(props: ProductDiscoveryProps & { slug: string; pageSize: number; columns: number }) {
+  const { slug, pageSize, columns } = props
+  const [built, config, template] = await Promise.all([
+    buildDiscoveryDataset(slug, props.defaultSort || 'best-selling'),
+    getShopConfigCached(),
+    resolveCardTemplate(props.layoutRef),
+  ])
+  if (!built) return null
+  const { products, matrix, combos, shelfMemberSets, orderedIds, nodes } = built
+
+  // What the SERVER should draw cards for: the first page of the state the
+  // address describes, worked out with the shell's own rules over the shell's
+  // own data, so what lands is the linked-to step rather than a page of whatever
+  // happened to be first.
+  const roots = buildNodeTree(nodes)
+  const path = parsePickPath(props.pick)
+  const resolved = resolveScope({ scopeType: 'ALL', scopeSlug: null }, roots, path)
+  const shelfLookup = (shelf: PdtShelf) => shelfMemberSets.get(shelfKey(shelf))
+  const matchesAll = (productId: string, filterIds: readonly string[]) => {
+    const matched = matrix.get(productId) ?? []
+    return filterIds.every((id) => matched.includes(id))
+  }
+  let eligible: string[] = orderedIds
+  for (const node of resolved.nodes) eligible = narrowByNode(eligible, node, shelfLookup, matchesAll)
+  const renderIds = eligible
+    .filter((id) => matchesSelection(matrix.get(id) ?? [], new Map(), comboFilterIds(combos.get(id))))
+    .slice(0, pageSize)
+
+  const productById = new Map(products.map((product) => [product.id, product]))
+  const items = await buildGridCardItems(renderIds.map((id) => productById.get(id)).filter((p): p is (typeof products)[number] => p != null))
+  // The opening row loads its pictures eagerly; the rest of the shelf stays lazy.
+  return <>{await renderDiscoveryCards(template, items, config.productUrlStyle, columns)}</>
 }
 
 export const productDiscoveryPuckRscComponent = {

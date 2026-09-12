@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'fs'
+import path from 'path'
 import { Suspense, type ReactElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { ProductDiscoveryRsc } from '@/modules/product-discovery-tool/components/puck/ProductDiscovery.rsc'
@@ -43,5 +45,52 @@ describe('the guided flow streams rather than blocking the first byte', () => {
     // And it announces itself, because a screen reader meeting an empty box wants
     // to know something is coming.
     expect(html).toContain('aria-busy')
+  })
+})
+
+// The SECOND split, and the one a shopper actually sees.
+//
+// Putting the whole block behind one boundary fixed the first byte but left the
+// opening question - "What are you looking for today?", five tiles, a small
+// table read - waiting behind the pass over five hundred products. So the page
+// arrived fast and then showed "Finding your options…" where the question should
+// have been.
+//
+// Now the cheap half renders the shell and its first step straight into the
+// HTML, and the product pass streams in underneath it under its own boundary.
+// The rule that keeps it that way is simply: the half that renders the shell
+// must not touch the expensive builder. It is a one-line mistake to undo - add
+// an await to the wrong function and the loading screen comes back - and
+// nothing else notices, because it still typechecks, still lints and still
+// renders the same markup in the end.
+describe('the opening step renders without waiting for the product pass', () => {
+  const source = readFileSync(path.join(__dirname, 'ProductDiscovery.rsc.tsx'), 'utf8')
+
+  /** One top-level function's body, by name. */
+  function bodyOf(name: string): string {
+    const at = source.indexOf(`function ${name}(`)
+    expect(at, `${name} should exist`).toBeGreaterThan(-1)
+    const rest = source.slice(at + 1)
+    const next = rest.search(/\n(?:async )?function [A-Z]/)
+    return next === -1 ? rest : rest.slice(0, next)
+  }
+
+  it('renders the shell without building the answer set', () => {
+    const body = bodyOf('ProductDiscoveryBody')
+    expect(body).toContain('<DiscoveryShell')
+    // The expensive pass belongs to the streamed half. An await on it here puts
+    // the opening question back behind the loading screen.
+    expect(body).not.toContain('buildDiscoveryDataset')
+  })
+
+  it('streams the cards under a boundary of their own', () => {
+    const body = bodyOf('ProductDiscoveryBody')
+    expect(body).toContain('<Suspense')
+    expect(body).toContain('<DiscoveryCards')
+  })
+
+  it('keeps the expensive pass in the streamed half', () => {
+    const body = bodyOf('DiscoveryCards')
+    expect(body).toContain('buildDiscoveryDataset')
   })
 })

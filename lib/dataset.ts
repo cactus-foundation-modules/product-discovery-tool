@@ -176,6 +176,7 @@ export async function buildDiscoveryDataset(
       sortKeys,
       serverOrder: orderedIds,
       shelfMembers,
+      groups: offered,
     },
     products,
     matrix,

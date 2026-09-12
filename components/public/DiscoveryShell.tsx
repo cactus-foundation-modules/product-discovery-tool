@@ -60,7 +60,12 @@ export type DiscoveryShellProps = {
   /** The groups this flow's whole scope can offer, culled by filters' own
    *  offerGroups and with their query-string keys already resolved (a group
    *  whose slug collides with `pick`, `sort` or `page` arrives under `q-`). */
-  groups: FltPublicGroup[]
+  /** Empty at first paint and filled from the fetched set.
+   *
+   *  Culling these needs the match matrix, so there is no cheap way to know them
+   *  before the expensive pass has run - and the opening step does not want
+   *  them. They are the FEATURES step's questions, several clicks away. */
+  groups?: FltPublicGroup[]
   /** The flow's answer set, FETCHED rather than serialised into the page.
    *
    *  Measured on the live homepage, spelling this into the HTML cost 660 KB of
@@ -81,7 +86,7 @@ export type DiscoveryShellProps = {
    *  its count is a tile that has to be redrawn, and the one-pass bargain says
    *  the number on a tile and the products behind it are the same answer. It is
    *  one integer per option, so it costs nothing to send. */
-  initialCounts: Record<string, number>
+  initialCounts?: Record<string, number>
   /** How many products the server's own state matches.
    *
    *  The toolbar and the empty state both read the match count, and before the
@@ -90,7 +95,7 @@ export type DiscoveryShellProps = {
    *  products. Nothing matches all of that." for as long as the fetch took, on a
    *  step whose cards are sitting on screen underneath. This is the same number,
    *  from the same pass, so the page says the truth from the first frame. */
-  initialMatchCount: number
+  initialMatchCount?: number | null
   /** Handed in only by a caller that already has the set - the tests, and a
    *  future caller with no round trip to make. Normally absent. */
   dataset?: PdtDatasetWire | null
@@ -125,8 +130,13 @@ export type DiscoveryShellProps = {
   /** The browse path the SERVER rendered for, from `?pick=`. The shell opens on
    *  it so the first paint is the linked-to step rather than step one. */
   initialPick: string
-  /** Which products `children` already holds cards for. */
-  renderedIds: string[]
+  /** Which products `children` already holds cards for.
+   *
+   *  Absent when the cards are STREAMING in under their own boundary - the
+   *  server cannot say what it has drawn before it has drawn it. The shell reads
+   *  the grid's own DOM instead at the moment it goes ready, which is the more
+   *  honest answer anyway: what is on screen is what is on screen. */
+  renderedIds?: string[]
   loadCards: PdtCardLoader
   children: React.ReactNode
 }
@@ -139,6 +149,8 @@ const EMPTY_MATRIX: Record<string, string[]> = {}
 const EMPTY_SORT_KEYS: Record<string, FltSortKey> = {}
 const EMPTY_ORDER: string[] = []
 const EMPTY_SHELF_MEMBERS: Record<string, number[]> = {}
+const EMPTY_COUNTS: Record<string, number> = {}
+const EMPTY_GROUPS: FltPublicGroup[] = []
 
 // Same rule, and the same hard-won reason, as FilterShell's: every pass that
 // writes to the cards must run in the SAME phase, because React runs all layout
@@ -158,9 +170,9 @@ const MAX_PRODUCT_COMPARE = 3
 
 export function DiscoveryShell(props: DiscoveryShellProps) {
   const {
-    flowSlug, allowSkip, finishCta, headings, settings, nodes, questions, notes, groups,
-    datasetHref, initialCounts, initialMatchCount, columns, pageSize, questionsPosition, autoOpenQuestions, drawerOptions,
-    firstStepFoot, defaultSort, barButton, tabletBp, initialPick, renderedIds, loadCards, children,
+    flowSlug, allowSkip, finishCta, headings, settings, nodes, questions, notes,
+    datasetHref, initialCounts = EMPTY_COUNTS, initialMatchCount = null, columns, pageSize, questionsPosition, autoOpenQuestions, drawerOptions,
+    firstStepFoot, defaultSort, barButton, tabletBp, initialPick, loadCards, children,
   } = props
 
   // The fetched answer set, and everything read off it.
@@ -176,6 +188,7 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
   const sortKeys = dataset?.sortKeys ?? EMPTY_SORT_KEYS
   const serverOrder = dataset?.serverOrder ?? EMPTY_ORDER
   const shelfMembers = dataset?.shelfMembers ?? EMPTY_SHELF_MEMBERS
+  const groups = dataset?.groups ?? props.groups ?? EMPTY_GROUPS
 
   const gridRef = useRef<HTMLDivElement>(null)
   const headingRef = useRef<HTMLHeadingElement>(null)
@@ -237,7 +250,25 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
   const movedRef = useRef(false)
 
   const [extraCards, setExtraCards] = useState<React.ReactNode[]>([])
-  const loadedIdsRef = useRef<Set<string>>(new Set(renderedIds))
+  // What the grid already holds cards for.
+  //
+  // Seeded from the prop when the server drew the cards inline, and from the
+  // grid's own DOM when they STREAMED in under their own boundary - in which
+  // case the server could not have said, because it had not drawn them yet when
+  // the shell was rendered. Reading the DOM is the more honest answer either
+  // way: what is on screen is what is on screen.
+  const loadedIdsRef = useRef<Set<string>>(new Set(props.renderedIds ?? []))
+  const seededRef = useRef(false)
+  useIsomorphicLayoutEffect(() => {
+    if (seededRef.current || !ready) return
+    seededRef.current = true
+    const root = gridRef.current
+    if (!root) return
+    for (const el of root.querySelectorAll<HTMLElement>('[data-pdt-product]')) {
+      const id = el.dataset.pdtProduct
+      if (id) loadedIdsRef.current.add(id)
+    }
+  }, [ready])
   const [cardsFailed, setCardsFailed] = useState(false)
   const [cardsLoading, setCardsLoading] = useState(false)
   const [cardRetry, setCardRetry] = useState(0)
@@ -391,7 +422,11 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
   // set is in; the server's until then, because the cards on screen are the
   // server's too, and two different numbers for one grid is worse than a late
   // one.
-  const matchCount = ready ? matchingIds.length : initialMatchCount
+  // NULL means "not known yet", which is a real third state now that the cards
+  // stream in under their own boundary: the server has not counted them because
+  // it has not drawn them. It is not zero, and printing it as zero would put
+  // "0 products. Nothing matches all of that." over a grid that is on its way.
+  const matchCount: number | null = ready ? matchingIds.length : initialMatchCount
 
   const windowIds = useMemo(() => matchingIds.slice(0, Math.max(pageSize, shownLimit)), [matchingIds, pageSize, shownLimit])
 
@@ -1105,8 +1140,8 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
               {/* A live region, so a shopper using a screen reader hears the
                   list change as they tick rather than discovering it later. */}
               <p className="pdt-showing" role="status">
-                {matchCount} {matchCount === 1 ? 'product' : 'products'}
-                {ready && selected.size > 0 && eligibleIds.length !== matchingIds.length ? ` of ${eligibleIds.length}` : ''}
+                {matchCount === null ? 'Finding products…' : `${matchCount} ${matchCount === 1 ? 'product' : 'products'}`}
+                {ready && matchCount !== null && selected.size > 0 && eligibleIds.length !== matchingIds.length ? ` of ${eligibleIds.length}` : ''}
               </p>
               <span style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                 {canCompareProducts && (
