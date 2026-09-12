@@ -1,4 +1,3 @@
-import { Render } from '@puckeditor/core/rsc'
 import type { Data } from '@puckeditor/core'
 import { withCardAdminEditHrefs } from '@/modules/shop/lib/card-template'
 import { injectShopProductCardEmbed } from '@/modules/shop/lib/inject-part-context'
@@ -6,6 +5,7 @@ import { formatMoney } from '@/modules/shop/lib/money'
 import { productHref, type ProductUrlStyle } from '@/modules/shop/lib/product-url'
 import type { PuckData } from '@/modules/shop/lib/types'
 import type { CardItem } from '@/modules/shop/lib/card-template'
+import { CactusRender } from '@/lib/puck/CactusRender'
 
 // Cards in the shop's own Product Card layout, tagged so the wizard can show,
 // hide and re-dress them in place. The flow never invents a card design.
@@ -42,7 +42,7 @@ export async function renderDiscoveryCards(template: PuckData | null, items: Car
         // `as any`: Puck's RSC Render is typed against a concrete config and the
         // module config is assembled at runtime - the same cast every surface
         // that stamps a document makes.
-        <Render config={config as any} data={injectShopProductCardEmbed(template, at < eagerCount ? { ...ctx, eager: true } : ctx, partTypes) as Data} />
+        <CactusRender config={config as any} data={injectShopProductCardEmbed(template, at < eagerCount ? { ...ctx, eager: true } : ctx, partTypes) as Data} />
       ) : (
         <>
           <div className="shop-card-img">

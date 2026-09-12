@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { Render } from '@puckeditor/core/rsc'
 import { getSiteUrlOrNull } from '@/lib/config/env'
 import { getSessionFromCookie } from '@/lib/auth/session'
 import { resolveThemeLayout } from '@/lib/layout/resolveThemeLayout'
@@ -13,6 +12,7 @@ import { formatPickPath, parsePickPath, PICK_PARAM } from '@/modules/product-dis
 import { PRODUCT_DISCOVERY_LAYOUT_TYPE, type PdtFlow, type PdtPuckData } from '@/modules/product-discovery-tool/lib/types'
 import { DiscoveryIntroBody } from '@/modules/product-discovery-tool/components/public/DiscoveryIntroBody'
 import { ProductDiscoveryRsc } from '@/modules/product-discovery-tool/components/puck/ProductDiscovery.rsc'
+import { CactusRender } from '@/lib/puck/CactusRender'
 
 // A flow's page, at the bare top-level address it owns.
 //
@@ -112,7 +112,7 @@ export default async function ProductDiscoveryFlowPage({ params, searchParams }:
         {banners}
         {/* `as any`: Puck's RSC Render is typed against a concrete config and
             the module config is assembled at runtime. */}
-        <Render config={getModuleLayoutPuckRscConfig(PRODUCT_DISCOVERY_LAYOUT_TYPE) as any} data={data as any} />
+        <CactusRender config={getModuleLayoutPuckRscConfig(PRODUCT_DISCOVERY_LAYOUT_TYPE) as any} data={data as any} />
       </>
     )
   }

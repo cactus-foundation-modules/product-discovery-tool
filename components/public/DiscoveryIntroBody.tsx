@@ -1,6 +1,6 @@
-import { Render } from '@puckeditor/core/rsc'
 import type { Data } from '@puckeditor/core'
 import { PRODUCT_DISCOVERY_INTRO_LAYOUT_TYPE, hasIntroContent, type PdtPuckData } from '@/modules/product-discovery-tool/lib/types'
+import { CactusRender } from '@/lib/puck/CactusRender'
 
 // A flow's designed intro. Shared by the Heading block and the built-in page
 // shell, so both make the same call about whether there is one.
@@ -18,7 +18,7 @@ export async function DiscoveryIntroBody({ intro, className, style }: {
       {/* `as any`: Puck's RSC Render is typed against a concrete config and the
           module config is assembled at runtime - the same cast every surface
           that stamps a document makes. */}
-      <Render config={getModuleLayoutPuckRscConfig(PRODUCT_DISCOVERY_INTRO_LAYOUT_TYPE) as any} data={intro as Data} />
+      <CactusRender config={getModuleLayoutPuckRscConfig(PRODUCT_DISCOVERY_INTRO_LAYOUT_TYPE) as any} data={intro as Data} />
     </div>
   )
 }
