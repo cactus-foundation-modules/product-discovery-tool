@@ -39,57 +39,35 @@ import { THUMB_RENDITION_SUFFIX } from '@/lib/media/thumb-renditions'
 // ordering need them for products no page has drawn yet), but a card is only
 // STAMPED for the window being rendered. That is where the megabytes are.
 
-// The flow is the heaviest thing on any page it sits on, and until now it was the
-// heaviest thing BEFORE the first byte: one pass resolves five hundred products,
-// runs every filter over them, prices them and orders them, and nothing else on the
-// page could be sent until it finished. Measured on the live homepage, that was 7 to
-// 8 seconds of blank browser on a render - against 0.45s for a page with no flow on
-// it. Every other page on the site tracked the same line, so it was the work, not
-// the network.
+// The flow used to be the heaviest thing BEFORE the first byte of any page it sat
+// on: one pass resolves five hundred products, runs every filter over them,
+// prices them and orders them, and nothing else on the page could be sent until
+// it finished. Measured on the live homepage, 7 to 8 seconds of blank browser,
+// against 0.45s for a page with no flow on it.
 //
-// It is behind a Suspense boundary now. The rest of the page - the header, the hero,
-// the other blocks - flushes straight away, and the flow streams in when it is
-// ready. The total work is unchanged and so is every byte of what arrives; what
-// changes is that nobody stares at nothing while it happens.
+// That pass is now behind a boundary of its own, down in DiscoveryCards. What is
+// left up here is small: the flow row, its nodes, its questions, its settings,
+// and one batched lookup for the browse pictures.
 //
-// Deliberately NOT a fix to the one-pass bargain itself: the counts on a browse card
-// and the products behind it are only the same answer because one pass produced both
-// (see DiscoveryShell). Streaming keeps that promise exactly and costs nothing.
+// THERE IS DELIBERATELY NO BOUNDARY AROUND THIS HALF, and that is a reversal
+// worth explaining. It had one, with a "Finding your options…" panel behind it -
+// and because any async component suspends, a cold render painted that panel
+// where the opening question should have been, then swapped it a moment later.
+// On a cached page nobody saw it; on a freshly deployed one it was the first
+// thing on the homepage, twice, and it reads as a site thinking rather than a
+// site working.
 //
-// The boundary has to be OUTSIDE the async work, which is why this is a plain
-// function wrapping an async one - a Suspense inside the async component would
-// already have awaited everything before React saw it.
-export function ProductDiscoveryRsc(props: ProductDiscoveryProps) {
-  return (
-    <Suspense fallback={<DiscoveryFlowLoading />}>
-      <ProductDiscoveryBody {...props} />
-    </Suspense>
-  )
-}
-
-// Holds the flow's place while it streams. A fixed minimum height rather than a
-// cleverer skeleton: the flow's real height depends on the shopper's answers, so
-// anything more specific would only be a different wrong shape, and reserving a
-// plausible block keeps the content under it from jumping when the real thing
-// lands. Tokens only, no client component, nothing to load.
-function DiscoveryFlowLoading() {
-  return (
-    <div
-      aria-busy="true"
-      aria-live="polite"
-      style={{
-        minHeight: '32rem',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: 'var(--color-text-muted)',
-        background: 'var(--color-bg-subtle)',
-        borderRadius: 'var(--border-radius, 6px)',
-      }}
-    >
-      Finding your options…
-    </div>
-  )
+// So this half blocks the page's first flush instead. It costs roughly 100ms of
+// first byte on a cold render of a page carrying the flow, and it buys an
+// opening question that is simply THERE - in the HTML, in the cached copy, with
+// nothing to swap and nothing to flash. The expensive half is still streamed, so
+// the thing that actually cost seconds still costs nobody anything.
+//
+// Deliberately NOT a fix to the one-pass bargain: the counts on a browse card and
+// the products behind it are only the same answer because one pass produced both
+// (see DiscoveryShell). The counts travel with that pass and arrive with it.
+export async function ProductDiscoveryRsc(props: ProductDiscoveryProps) {
+  return ProductDiscoveryBody(props)
 }
 
 async function ProductDiscoveryBody(props: ProductDiscoveryProps) {

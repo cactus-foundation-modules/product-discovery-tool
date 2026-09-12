@@ -7,46 +7,26 @@ import { ProductDiscoveryRsc } from '@/modules/product-discovery-tool/components
 
 // The flow is the heaviest thing on any page it sits on: one pass resolves five
 // hundred products, runs every filter over them, prices them and orders them.
-// Measured on the live homepage, doing that BEFORE the first byte was 7 to 8 seconds
-// of blank browser, against 0.45s for a page with no flow on it.
+// Measured on the live homepage, doing that BEFORE the first byte was 7 to 8
+// seconds of blank browser, against 0.45s for a page with no flow on it.
 //
-// The fix is a Suspense boundary, and it only works if it sits OUTSIDE the async
-// work - a `<Suspense>` written inside an async component has already awaited
-// everything by the time React sees it, which looks identical in review and streams
-// nothing. So the shape is the fix, and the shape is what this guards:
+// WHAT IS GUARDED HERE, AND WHAT IS NOT. The boundary belongs around the
+// EXPENSIVE half and nothing else. It used to sit around the whole block, which
+// fixed the first byte and then painted "Finding your options…" where the
+// opening question should have been on any cold render - because any async
+// component suspends, however small its queries are. That panel is gone on
+// purpose: the cheap half (the flow row, its nodes, its questions, its settings)
+// blocks the first flush, costing about 100ms on a cold render, and the opening
+// question is simply in the HTML.
 //
-//   - the exported component must NOT be async, and
-//   - what it returns must be a Suspense boundary with a fallback.
+// So the shape this file pins is:
 //
-// Nothing else can catch this. It typechecks either way, it lints either way, it
-// renders the same markup either way, and the only symptom is a slow first byte on
-// somebody else's machine.
-describe('the guided flow streams rather than blocking the first byte', () => {
-  it('is not an async component', () => {
-    // An async function's constructor is AsyncFunction; awaiting the whole flow
-    // before returning is exactly what we are preventing.
-    expect(ProductDiscoveryRsc.constructor.name).toBe('Function')
-  })
-
-  it('returns a Suspense boundary that has a fallback', () => {
-    // Called with the bare minimum - it must not touch the database to hand back
-    // the boundary, which is the whole point of the split.
-    const el = ProductDiscoveryRsc({ flowSlug: 'anything' } as Parameters<typeof ProductDiscoveryRsc>[0]) as ReactElement<{ fallback?: unknown }>
-    expect(el.type).toBe(Suspense)
-    expect(el.props.fallback).toBeTruthy()
-  })
-
-  it('holds a minimum height, so the page below it does not jump when the flow lands', () => {
-    const el = ProductDiscoveryRsc({ flowSlug: 'anything' } as Parameters<typeof ProductDiscoveryRsc>[0]) as ReactElement<{ fallback?: ReactElement }>
-    // Rendered rather than inspected: the height lives inside the placeholder
-    // component, not on the element handed to Suspense.
-    const html = renderToStaticMarkup(el.props.fallback as ReactElement)
-    expect(html).toMatch(/min-height/i)
-    // And it announces itself, because a screen reader meeting an empty box wants
-    // to know something is coming.
-    expect(html).toContain('aria-busy')
-  })
-})
+//   - the expensive pass lives behind its own boundary, in DiscoveryCards, and
+//   - the half that renders the shell never touches it.
+//
+// Nothing else can catch a regression here. It typechecks either way, it lints
+// either way, it renders the same markup in the end either way, and the symptom
+// is either a slow first byte or a loading panel on somebody else's machine.
 
 // The SECOND split, and the one a shopper actually sees.
 //
@@ -64,7 +44,16 @@ describe('the guided flow streams rather than blocking the first byte', () => {
 // nothing else notices, because it still typechecks, still lints and still
 // renders the same markup in the end.
 describe('the opening step renders without waiting for the product pass', () => {
-  const source = readFileSync(path.join(__dirname, 'ProductDiscovery.rsc.tsx'), 'utf8')
+  const raw = readFileSync(path.join(__dirname, 'ProductDiscovery.rsc.tsx'), 'utf8')
+  // Comments stripped before anything is asserted, because the file EXPLAINS the
+  // panel it no longer renders - and a check that reads its own explanation as
+  // the thing it is banning fails on a correct file. Same lesson, and the same
+  // fix, as lib/puck/CactusRender.test.ts.
+  const source = raw
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .split('\n')
+    .map((line) => (line.trimStart().startsWith('//') ? '' : line))
+    .join('\n')
 
   /** One top-level function's body, by name. */
   function bodyOf(name: string): string {
@@ -87,6 +76,16 @@ describe('the opening step renders without waiting for the product pass', () => 
     const body = bodyOf('ProductDiscoveryBody')
     expect(body).toContain('<Suspense')
     expect(body).toContain('<DiscoveryCards')
+  })
+
+  it('has no loading panel of its own for the opening step to hide behind', () => {
+    // The reversal this file exists to keep. A boundary around the CHEAP half
+    // paints a panel on every cold render, because any async component suspends
+    // however small its queries are - and that panel is what a shopper met on
+    // the homepage instead of the question. If somebody adds one back, this is
+    // the only thing that will notice.
+    expect(source).not.toContain('Finding your options')
+    expect(source).not.toMatch(/<Suspense[\s\S]{0,200}<ProductDiscoveryBody/)
   })
 
   it('keeps the expensive pass in the streamed half', () => {
