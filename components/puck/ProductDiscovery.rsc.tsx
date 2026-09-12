@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { connection } from 'next/server'
 import { HARD_MAX_PER_PAGE, listTags } from '@/modules/shop/lib/db'
 import { getShopConfigCached } from '@/modules/shop/lib/config'
@@ -27,6 +28,8 @@ import { DiscoveryShell } from '@/modules/product-discovery-tool/components/publ
 import { discoveryCss } from '@/modules/product-discovery-tool/components/public/discovery-css'
 import { productDiscoveryPuckComponent, type ProductDiscoveryProps } from './ProductDiscovery'
 import { SharedStyle } from '@/components/SharedStyle'
+import { findRenditionUrls } from '@/lib/media/rendition-lookup'
+import { THUMB_RENDITION_SUFFIX } from '@/lib/media/thumb-renditions'
 
 // Server (RSC) half of Discovery: Guided Flow.
 //
@@ -41,7 +44,60 @@ import { SharedStyle } from '@/components/SharedStyle'
 // ordering need them for products no page has drawn yet), but a card is only
 // STAMPED for the window being rendered. That is where the megabytes are.
 
-export async function ProductDiscoveryRsc(props: ProductDiscoveryProps) {
+// The flow is the heaviest thing on any page it sits on, and until now it was the
+// heaviest thing BEFORE the first byte: one pass resolves five hundred products,
+// runs every filter over them, prices them and orders them, and nothing else on the
+// page could be sent until it finished. Measured on the live homepage, that was 7 to
+// 8 seconds of blank browser on a render - against 0.45s for a page with no flow on
+// it. Every other page on the site tracked the same line, so it was the work, not
+// the network.
+//
+// It is behind a Suspense boundary now. The rest of the page - the header, the hero,
+// the other blocks - flushes straight away, and the flow streams in when it is
+// ready. The total work is unchanged and so is every byte of what arrives; what
+// changes is that nobody stares at nothing while it happens.
+//
+// Deliberately NOT a fix to the one-pass bargain itself: the counts on a browse card
+// and the products behind it are only the same answer because one pass produced both
+// (see DiscoveryShell). Streaming keeps that promise exactly and costs nothing.
+//
+// The boundary has to be OUTSIDE the async work, which is why this is a plain
+// function wrapping an async one - a Suspense inside the async component would
+// already have awaited everything before React saw it.
+export function ProductDiscoveryRsc(props: ProductDiscoveryProps) {
+  return (
+    <Suspense fallback={<DiscoveryFlowLoading />}>
+      <ProductDiscoveryBody {...props} />
+    </Suspense>
+  )
+}
+
+// Holds the flow's place while it streams. A fixed minimum height rather than a
+// cleverer skeleton: the flow's real height depends on the shopper's answers, so
+// anything more specific would only be a different wrong shape, and reserving a
+// plausible block keeps the content under it from jumping when the real thing
+// lands. Tokens only, no client component, nothing to load.
+function DiscoveryFlowLoading() {
+  return (
+    <div
+      aria-busy="true"
+      aria-live="polite"
+      style={{
+        minHeight: '32rem',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: 'var(--color-text-muted)',
+        background: 'var(--color-bg-subtle)',
+        borderRadius: 'var(--border-radius, 6px)',
+      }}
+    >
+      Finding your options…
+    </div>
+  )
+}
+
+async function ProductDiscoveryBody(props: ProductDiscoveryProps) {
   await connection()
   const slug = (props.flowSlug ?? '').trim()
   if (!slug) return null
@@ -68,6 +124,21 @@ export async function ProductDiscoveryRsc(props: ProductDiscoveryProps) {
   const flowShelves: PdtShelf[] = flow.scopeType !== 'ALL' && flow.scopeSlug
     ? [{ type: flow.scopeType, slug: flow.scopeSlug }]
     : []
+
+  // The browse pictures, at the size they are actually drawn.
+  //
+  // A choice tile shows its picture at 216px square and was being handed the
+  // original: measured on the live homepage, five of them came to 988 KB - one was
+  // 1920x1920 - which made them the heaviest thing left on the page by a distance.
+  // One batched lookup for the whole flow, from the sharp-free half of the media
+  // library, and a node whose picture has no small copy keeps the original.
+  const nodeImages = nodes.map((n) => n.imageUrl).filter((u): u is string => !!u)
+  const nodeThumbs = nodeImages.length
+    ? await findRenditionUrls(nodeImages, THUMB_RENDITION_SUFFIX).catch(() => new Map<string, string>())
+    : new Map<string, string>()
+  const drawnNodes = nodeThumbs.size
+    ? nodes.map((n) => (n.imageUrl && nodeThumbs.has(n.imageUrl) ? { ...n, imageUrl: nodeThumbs.get(n.imageUrl)! } : n))
+    : nodes
 
   const products = await loadScopedProducts(flowShelves, HARD_MAX_PER_PAGE)
   if (products.length === 0) {
@@ -183,7 +254,7 @@ export async function ProductDiscoveryRsc(props: ProductDiscoveryProps) {
         finishCta={flow.finishCtaLabel && flow.finishCtaHref ? { label: flow.finishCtaLabel, href: flow.finishCtaHref } : null}
         headings={{ first: flow.firstStepHeading, later: flow.laterStepHeading, features: flow.featuresHeading }}
         settings={settings}
-        nodes={nodes}
+        nodes={drawnNodes}
         questions={questions}
         notes={notes}
         groups={offered}

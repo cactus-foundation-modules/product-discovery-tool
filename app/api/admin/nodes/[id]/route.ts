@@ -36,6 +36,30 @@ export async function PUT(request: Request, { params }: Ctx) {
   }
   await updateNode(id, fields)
   if (filterIds) await setNodeFilters(id, filterIds)
+
+  // Make the small copy of the tile's picture, because the public flow draws that
+  // rather than the original - a choice tile is 216px square and the pictures picked
+  // for one are routinely 1920px. Only the shop asked for small copies until now, so
+  // a picture chosen here and nowhere else had nobody to make one for it.
+  //
+  // Dynamically imported: the resizer pulls in sharp, and a static import would put
+  // an image library into every function that can reach this route. Never allowed to
+  // fail the save - a tile with no small copy is drawn from the original, which is
+  // heavier and perfectly correct.
+  if (fields.imageUrl) {
+    try {
+      const { generateImageRendition } = await import('@/lib/media/renditions')
+      const { THUMB_RENDITION_MAX_PX, THUMB_RENDITION_SUFFIX, THUMB_RENDITION_WORTHWHILE_BYTES } =
+        await import('@/lib/media/thumb-renditions')
+      await generateImageRendition(fields.imageUrl, {
+        maxPx: THUMB_RENDITION_MAX_PX,
+        suffix: THUMB_RENDITION_SUFFIX,
+        worthwhileBytes: THUMB_RENDITION_WORTHWHILE_BYTES,
+      })
+    } catch (err) {
+      console.warn('[discovery] could not make a small copy of the tile picture:', err)
+    }
+  }
   return NextResponse.json({ node: await getNode(id) })
 }
 
