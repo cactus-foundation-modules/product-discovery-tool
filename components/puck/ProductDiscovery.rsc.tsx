@@ -11,13 +11,13 @@ import { sortValueFromParam } from '@/modules/filters-for-shop/lib/sort'
 import { getFlowBySlug } from '@/modules/product-discovery-tool/lib/db/flows'
 import { listNodes } from '@/modules/product-discovery-tool/lib/db/nodes'
 import { listQuestions } from '@/modules/product-discovery-tool/lib/db/questions'
-import { listNotes } from '@/modules/product-discovery-tool/lib/db/notes'
 import { getSettings } from '@/modules/product-discovery-tool/lib/db/settings'
 import { buildNodeTree, parsePickPath, type PdtTreeNode } from '@/modules/product-discovery-tool/lib/flow'
 import { narrowByNode, resolveScope, type PdtShelf } from '@/modules/product-discovery-tool/lib/resolve'
 import { renderDiscoveryCards } from '@/modules/product-discovery-tool/lib/discovery-cards'
 import { loadDiscoveryCards } from '@/modules/product-discovery-tool/lib/cards-action'
 import { buildDiscoveryDataset, shelfKey } from '@/modules/product-discovery-tool/lib/dataset'
+import { PDT_DATASET_WIRE_VERSION } from '@/modules/product-discovery-tool/lib/dataset-wire'
 import { DiscoveryShell } from '@/modules/product-discovery-tool/components/public/DiscoveryShell'
 import { discoveryCss } from '@/modules/product-discovery-tool/components/public/discovery-css'
 import { productDiscoveryPuckComponent, type ProductDiscoveryProps } from './ProductDiscovery'
@@ -88,11 +88,16 @@ async function ProductDiscoveryBody(props: ProductDiscoveryProps) {
   // Splitting them is what lets "What are you looking for today?" arrive with the
   // page instead of behind "Finding your options…": the shell and its first step
   // render from these, and the product pass streams in underneath.
-  const [bp, nodes, questions, notes, settings] = await Promise.all([
+  //
+  // The option notes are NOT among them. Every note on the site was read here and
+  // written into the page - 41 KB of every homepage view - for copy nobody can
+  // open until the features step's questions exist, and those arrive with the
+  // fetched answer set. The notes travel with it now, scoped to this flow (see
+  // lib/notes-scope.ts).
+  const [bp, nodes, questions, settings] = await Promise.all([
     getShopBreakpoints(),
     listNodes(flow.id),
     listQuestions(flow.id),
-    listNotes(),
     getSettings(),
   ])
 
@@ -123,8 +128,10 @@ async function ProductDiscoveryBody(props: ProductDiscoveryProps) {
 
   // The dataset's own address. `sort` rides along because `serverOrder` has to
   // match the order the cards were drawn in; the CDN keys on the whole query
-  // string, so two flows, or one flow ordered two ways, cache separately.
-  const datasetHref = `/api/m/product-discovery-tool/public/dataset?flow=${encodeURIComponent(slug)}&sort=${encodeURIComponent(props.defaultSort || 'best-selling')}`
+  // string, so two flows, or one flow ordered two ways, cache separately. `v` is
+  // the wire format's version, so a shell expecting a newer shape is never handed
+  // a cached copy of an older one.
+  const datasetHref = `/api/m/product-discovery-tool/public/dataset?flow=${encodeURIComponent(slug)}&sort=${encodeURIComponent(props.defaultSort || 'best-selling')}&v=${PDT_DATASET_WIRE_VERSION}`
 
   return (
     <>
@@ -139,7 +146,6 @@ async function ProductDiscoveryBody(props: ProductDiscoveryProps) {
         settings={settings}
         nodes={drawnNodes}
         questions={questions}
-        notes={notes}
         // The answer set is FETCHED, not inlined - 660 KB of flight payload on
         // every view of this page, for a block most visitors never touch. The
         // culled question groups and the tile counts travel with it, because
@@ -222,8 +228,16 @@ async function DiscoveryCards(props: ProductDiscoveryProps & { slug: string; pag
 
   const productById = new Map(products.map((product) => [product.id, product]))
   const items = await buildGridCardItems(renderIds.map((id) => productById.get(id)).filter((p): p is (typeof products)[number] => p != null))
-  // The opening row loads its pictures eagerly; the rest of the shelf stays lazy.
-  return <>{await renderDiscoveryCards(template, items, config.productUrlStyle, columns)}</>
+  // Every picture lazily unless the owner has said this block opens the page;
+  // then the opening row eagerly and the rest of the shelf lazily. See the
+  // imageLoading prop for why the block cannot work it out for itself.
+  //
+  // Lazy rather than eager-without-priority for the rest, because React writes a
+  // preload hint into the page for every server-rendered picture that is not
+  // lazy. "Eager but not urgent" would still put a row of result thumbnails in
+  // the queue ahead of whatever the page really opens with.
+  const eagerCount = props.imageLoading === 'eager' ? columns : 0
+  return <>{await renderDiscoveryCards(template, items, config.productUrlStyle, eagerCount)}</>
 }
 
 export const productDiscoveryPuckRscComponent = {

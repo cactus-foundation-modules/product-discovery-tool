@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { buildDiscoveryDataset } from '@/modules/product-discovery-tool/lib/dataset'
+import { buildDiscoveryDatasetWire } from '@/modules/product-discovery-tool/lib/dataset'
 
 // The flow's answer set, fetched by the shell instead of being serialised into
 // every page the flow sits on.
@@ -19,8 +19,8 @@ import { buildDiscoveryDataset } from '@/modules/product-discovery-tool/lib/data
 // headers (lib/cache/module-api-cache.ts), so the CDN answers nearly all of it.
 //
 // NOTHING PRIVATE PASSES THROUGH HERE. It is the same catalogue data that was
-// inlined into public HTML until now - which products match which filters, and
-// what each one is called and costs. There is no identifier in it, nothing about
+// inlined into public HTML until now - which products match which filters, what
+// each one is called and costs, and the published guidance on each option. There is no identifier in it, nothing about
 // who is asking, and no route to anything a shopper could not already see by
 // reading the page source. That is precisely why it is safe to let a CDN hand
 // one copy to everybody.
@@ -36,6 +36,9 @@ const Query = z.object({
   // cards in, or the grid rearranges itself the moment this lands. Blank is
   // allowed and means the shop's own order.
   sort: z.string().max(40).optional(),
+  // The address also carries `v`, the wire format's version, which is never
+  // read here: it exists only so the CDN keeps a copy per shape. See
+  // PDT_DATASET_WIRE_VERSION.
 })
 
 export async function GET(req: Request) {
@@ -48,10 +51,10 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Unknown flow.' }, { status: 400 })
   }
 
-  const built = await buildDiscoveryDataset(parsed.data.flow, parsed.data.sort ?? '')
+  const wire = await buildDiscoveryDatasetWire(parsed.data.flow, parsed.data.sort ?? '')
   // No flow, or a flow whose shelves are empty. Both are "there is nothing to
   // guide anybody through", and the block has already drawn that case.
-  if (!built) return NextResponse.json({ error: 'Unknown flow.' }, { status: 404 })
+  if (!wire) return NextResponse.json({ error: 'Unknown flow.' }, { status: 404 })
 
-  return NextResponse.json(built.wire)
+  return NextResponse.json(wire)
 }

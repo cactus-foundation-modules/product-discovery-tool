@@ -22,8 +22,10 @@ import { CactusRender } from '@/lib/puck/CactusRender'
 //
 // `eagerCount` matches shop's renderCards: how many cards at the front of this
 // list are above the fold and so load their picture eagerly. The first render
-// passes its column count; the fetched pages pass nothing, because a page the
-// shopper scrolled to is by definition already scrolled past.
+// passes its column count only when the owner has said the block opens the page
+// (the block's "Pictures in the first row" field); the fetched pages pass
+// nothing, because a page the shopper scrolled to is by definition already
+// scrolled past.
 export async function renderDiscoveryCards(template: PuckData | null, items: CardItem[], urlStyle: ProductUrlStyle, eagerCount = 0) {
   const { getModuleLayoutPuckRscConfig } = await import('@/lib/puck/config.rsc')
   const config = getModuleLayoutPuckRscConfig('shopProductCard')

@@ -20,7 +20,8 @@ import { StepBrowse } from '@/modules/product-discovery-tool/components/public/S
 import { StepFeatures, type PdtQuestionView } from '@/modules/product-discovery-tool/components/public/StepFeatures'
 import { CompareTable } from '@/modules/product-discovery-tool/components/public/CompareTable'
 import { AnswerChips, type PdtAnswerChip } from '@/modules/product-discovery-tool/components/public/AnswerChips'
-import type { PdtDatasetWire } from '@/modules/product-discovery-tool/lib/dataset-wire'
+import { readDatasetWire, type PdtDatasetWire } from '@/modules/product-discovery-tool/lib/dataset-wire'
+import { browserDatasetDemandEnvironment, watchForDatasetDemand } from '@/modules/product-discovery-tool/lib/dataset-demand'
 
 // The guided flow, in the browser.
 //
@@ -56,7 +57,15 @@ export type DiscoveryShellProps = {
   settings: PdtShellSettings
   nodes: PdtNode[]
   questions: PdtQuestion[]
-  notes: PdtOptionNote[]
+  /** The option notes, for a caller that has them in hand. Normally ABSENT: the
+   *  notes travel with the fetched answer set (`dataset.notes`), which wins when
+   *  both are present.
+   *
+   *  Nothing reads a note before the set lands anyway. A note is only ever shown
+   *  on a features-step option or in that step's comparison table, and until the
+   *  set arrives `groups` is empty - there is no option to explain and no group
+   *  to compare - so leaving them out of the page changes nothing on screen. */
+  notes?: PdtOptionNote[]
   /** The groups this flow's whole scope can offer, culled by filters' own
    *  offerGroups and with their query-string keys already resolved (a group
    *  whose slug collides with `pick`, `sort` or `page` arrives under `q-`). */
@@ -151,6 +160,7 @@ const EMPTY_ORDER: string[] = []
 const EMPTY_SHELF_MEMBERS: Record<string, number[]> = {}
 const EMPTY_COUNTS: Record<string, number> = {}
 const EMPTY_GROUPS: FltPublicGroup[] = []
+const EMPTY_NOTES: PdtOptionNote[] = []
 
 // Same rule, and the same hard-won reason, as FilterShell's: every pass that
 // writes to the cards must run in the SAME phase, because React runs all layout
@@ -170,7 +180,7 @@ const MAX_PRODUCT_COMPARE = 3
 
 export function DiscoveryShell(props: DiscoveryShellProps) {
   const {
-    flowSlug, allowSkip, finishCta, headings, settings, nodes, questions, notes,
+    flowSlug, allowSkip, finishCta, headings, settings, nodes, questions,
     datasetHref, initialCounts = EMPTY_COUNTS, initialMatchCount = null, columns, pageSize, questionsPosition, autoOpenQuestions, drawerOptions,
     firstStepFoot, defaultSort, barButton, tabletBp, initialPick, loadCards, children,
   } = props
@@ -189,7 +199,9 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
   const serverOrder = dataset?.serverOrder ?? EMPTY_ORDER
   const shelfMembers = dataset?.shelfMembers ?? EMPTY_SHELF_MEMBERS
   const groups = dataset?.groups ?? props.groups ?? EMPTY_GROUPS
+  const notes = dataset?.notes ?? props.notes ?? EMPTY_NOTES
 
+  const wrapRef = useRef<HTMLDivElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
   const headingRef = useRef<HTMLHeadingElement>(null)
 
@@ -214,33 +226,40 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
   const ready = urlRead && dataset !== null
 
 
-  // Fetched once, as soon as the shell mounts rather than on first click: by the
-  // time anybody has read the first question it has usually arrived, so engaging
-  // with the flow still feels immediate. Failure is quiet on purpose - the
-  // server's own first step and first page stay on screen, which is a working
-  // page rather than an error - and a retry costs one more request.
+  // Fetched once, ahead of first click but not ahead of need: when the block
+  // comes within about a viewport of the screen, or the shopper reaches for it,
+  // whichever is first - and once the browser is idle, as it always was, where
+  // neither can be watched or the address already points inside the flow. The
+  // viewport of lead keeps the reason it was fetched early at all: by the time
+  // anybody has read the first question it has usually arrived, so engaging with
+  // the flow still feels immediate. The large majority who scroll past, or never
+  // get that far, no longer download and parse it. See lib/dataset-demand.ts.
+  //
+  // Failure is quiet on purpose - the server's own first step and first page
+  // stay on screen, which is a working page rather than an error - and a retry
+  // costs one more request.
   const wantedDataset = props.dataset == null
   useEffect(() => {
     if (!wantedDataset) return
     let live = true
-    const run = () => {
+    const fetchDataset = () => {
       fetch(datasetHref, { headers: { accept: 'application/json' } })
         .then((res) => (res.ok ? res.json() : null))
-        .then((json: PdtDatasetWire | null) => {
-          if (live && json && typeof json === 'object' && json.matrix) setDataset(json)
+        .then((json: unknown) => {
+          const wire = readDatasetWire(json)
+          if (live && wire) setDataset(wire)
         })
         .catch(() => {})
     }
-    // After paint, so parsing it never lands in front of the first frame. The
-    // timeout is the ceiling rather than the plan: an idle moment almost always
-    // comes first, and a page that never goes idle should not leave the finder
-    // inert for ever.
-    const idler = window.requestIdleCallback
-    const id = typeof idler === 'function' ? idler(run, { timeout: 1500 }) : window.setTimeout(run, 0)
+    const stopWatching = watchForDatasetDemand({
+      element: wrapRef.current,
+      arrivedInsideFlow: new URLSearchParams(window.location.search).has(PICK_PARAM),
+      onDemand: fetchDataset,
+      environment: browserDatasetDemandEnvironment(),
+    })
     return () => {
       live = false
-      if (typeof idler === 'function') window.cancelIdleCallback(id)
-      else window.clearTimeout(id)
+      stopWatching()
     }
   }, [wantedDataset, datasetHref])
   const [notFound, setNotFound] = useState(false)
@@ -1079,7 +1098,7 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
   )
 
   return (
-    <div className="pdt-wrap">
+    <div className="pdt-wrap" ref={wrapRef}>
       <div className="pdt-progress" {...PDT_UNSTYLED}>
         {stepIndex > 0 && (
           <button type="button" className="pdt-back" onClick={() => backTo(stepIndex - 1)}>‹ Back</button>

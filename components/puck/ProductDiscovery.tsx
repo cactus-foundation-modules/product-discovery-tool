@@ -16,6 +16,22 @@ export type ProductDiscoveryProps = {
    *  injects it); typed by hand when the block is dropped on an ordinary page. */
   flowSlug?: string
   columns?: number
+  // Whether the pictures in the results' opening row are fetched straight away
+  // or as the shopper scrolls towards them. Blank - every block saved before this
+  // existed - is as they scroll. Same field, same wording and same values as
+  // shop's Product Grid, because it is the same question about the same cards and
+  // an owner should not have to learn it twice.
+  //
+  // A setting rather than a detection because a block cannot see where it has
+  // been put: Puck hands it no position, and nothing in the render knows whether
+  // the flow opens the page or sits under a hero and three other sections, which
+  // is where it is on the live homepage. The results used to assume they opened
+  // the page, and marked their first row eager and urgent - which is also a
+  // preload hint in the page head for each of those pictures, queued ahead of
+  // the page's real first picture.
+  //
+  // So the owner, who can see the page, says so. Only 'eager' changes anything.
+  imageLoading?: string
   /** Where step three's questions sit on a wide screen. Named and worded to
    *  match filters' own grid, which offers the same choice over the same
    *  vocabulary. Tablet and below both put them behind the "Narrow down" bar. */
@@ -147,6 +163,17 @@ export const productDiscoveryPuckComponent = {
   fields: {
     flowSlug: flowField,
     columns: { type: 'number' as const, label: 'Result columns' },
+    // See the prop's note above. Worded to match shop's Product Grid, saying
+    // where the block is rather than how the browser fetches, because that is
+    // the thing the owner can judge.
+    imageLoading: {
+      type: 'select' as const,
+      label: 'Pictures in the first row',
+      options: [
+        { value: 'auto', label: 'Load as the shopper scrolls to them' },
+        { value: 'eager', label: 'Load immediately (this block is at the top of the page)' },
+      ],
+    },
     questionsPosition: {
       type: 'select' as const,
       label: 'Questions',
@@ -194,6 +221,7 @@ export const productDiscoveryPuckComponent = {
   defaultProps: {
     flowSlug: '',
     columns: 3,
+    imageLoading: 'auto',
     questionsPosition: 'left',
     autoOpenQuestions: 'no',
     drawerOptions: 'side-by-side',

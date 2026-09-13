@@ -4,6 +4,7 @@ import path from 'path'
 import { Suspense, type ReactElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { ProductDiscoveryRsc } from '@/modules/product-discovery-tool/components/puck/ProductDiscovery.rsc'
+import { productDiscoveryPuckComponent } from '@/modules/product-discovery-tool/components/puck/ProductDiscovery'
 
 // The flow is the heaviest thing on any page it sits on: one pass resolves five
 // hundred products, runs every filter over them, prices them and orders them.
@@ -91,5 +92,63 @@ describe('the opening step renders without waiting for the product pass', () => 
   it('keeps the expensive pass in the streamed half', () => {
     const body = bodyOf('DiscoveryCards')
     expect(body).toContain('buildDiscoveryDataset')
+  })
+})
+
+// The option notes used to be every note on the site, read by the cheap half and
+// written into the page: 41 KB of every homepage view, for copy nobody can open
+// until the features step's questions exist - and those only arrive with the
+// fetched answer set. They travel with that set now (lib/dataset.ts), and this is
+// the one-line regression nothing else would notice: the page still renders, the
+// guidance still works, and every visitor quietly pays for it again.
+describe('the option notes stay off the page', () => {
+  const source = readFileSync(path.join(__dirname, 'ProductDiscovery.rsc.tsx'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .split('\n')
+    .map((line) => (line.trimStart().startsWith('//') ? '' : line))
+    .join('\n')
+
+  it('does not read the notes to render the block', () => {
+    expect(source).not.toMatch(/listNotes/)
+  })
+
+  it('does not hand the shell a notes prop', () => {
+    expect(source).not.toMatch(/\bnotes=\{/)
+  })
+
+  it('asks for the dataset by the wire version, so no shell is handed an older shape from the CDN', () => {
+    expect(source).toContain('v=${PDT_DATASET_WIRE_VERSION}')
+  })
+})
+
+// The results' first row used to load its pictures eagerly and urgently wherever
+// the block was put - which is also a preload hint in the page head per picture,
+// queued ahead of the page's real first picture. A block cannot see whether it
+// opens the page, so the owner says so, with the same field shop's Product Grid
+// offers for the same cards.
+describe('pictures in the first row', () => {
+  const source = readFileSync(path.join(__dirname, 'ProductDiscovery.rsc.tsx'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .split('\n')
+    .map((line) => (line.trimStart().startsWith('//') ? '' : line))
+    .join('\n')
+
+  it('offers the owner the same choice, in the same words, as shop\'s Product Grid', () => {
+    const field = productDiscoveryPuckComponent.fields.imageLoading
+    expect(field.label).toBe('Pictures in the first row')
+    expect(field.options.map((option) => option.value)).toEqual(['auto', 'eager'])
+    expect(field.options[0]!.label).toBe('Load as the shopper scrolls to them')
+    expect(field.options[1]!.label).toMatch(/^Load immediately \(/)
+  })
+
+  it('loads as the shopper scrolls unless told otherwise', () => {
+    expect(productDiscoveryPuckComponent.defaultProps.imageLoading).toBe('auto')
+  })
+
+  it('only marks the opening row eager when the owner has asked for it', () => {
+    expect(source).toMatch(/const eagerCount = props\.imageLoading === 'eager' \? columns : 0/)
+    expect(source).toContain('renderDiscoveryCards(template, items, config.productUrlStyle, eagerCount)')
+    // The old unconditional form, which is the regression.
+    expect(source).not.toContain('config.productUrlStyle, columns)')
   })
 })

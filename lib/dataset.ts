@@ -10,11 +10,13 @@ import { sortProductIds, sortValueFromParam, type FltSortKey, type FltSortValue 
 import type { FltPublicGroup, FltVariationIndex } from '@/modules/filters-for-shop/components/public/FilterShell'
 import { getFlowBySlug } from '@/modules/product-discovery-tool/lib/db/flows'
 import { listNodes } from '@/modules/product-discovery-tool/lib/db/nodes'
+import { listNotesForFlow } from '@/modules/product-discovery-tool/lib/db/notes'
+import { notesTheFlowCanShow } from '@/modules/product-discovery-tool/lib/notes-scope'
 import { loadScopedProducts, loadShelfMembers, shelfKey } from '@/modules/product-discovery-tool/lib/catalogue'
 import { paramForGroupSlug } from '@/modules/product-discovery-tool/lib/types'
 import type { PdtShelf } from '@/modules/product-discovery-tool/lib/resolve'
 import type { PdtNode } from '@/modules/product-discovery-tool/lib/types'
-import type { PdtDatasetWire } from '@/modules/product-discovery-tool/lib/dataset-wire'
+import type { PdtDatasetAnswers, PdtDatasetWire } from '@/modules/product-discovery-tool/lib/dataset-wire'
 
 // The flow's whole answer set, in one place, because two callers need the same
 // one and a second copy of this arithmetic would be a bug waiting to happen.
@@ -46,7 +48,12 @@ import type { PdtDatasetWire } from '@/modules/product-discovery-tool/lib/datase
 /** Everything the wire form is built from, for the caller that also has to draw
  *  the first page of cards and count the first step's tiles. */
 export type PdtDatasetBuild = {
-  wire: PdtDatasetWire
+  /** The flow the set was built for. The route reads its notes by it. */
+  flowId: string
+  /** The wire form of the answers. The route adds the notes on its way out -
+   *  see buildDiscoveryDatasetWire - and the block, which only draws cards,
+   *  never needs them. */
+  answers: PdtDatasetAnswers
   /** The products in the flow's scope, in the shop's own order. */
   products: Awaited<ReturnType<typeof loadScopedProducts>>
   matrix: Map<string, string[]>
@@ -169,7 +176,8 @@ export async function buildDiscoveryDataset(
   }
 
   return {
-    wire: {
+    flowId: flow.id,
+    answers: {
       matrix: Object.fromEntries(matrix),
       variations: internVariations(combos),
       swaps: packSwaps(swaps),
@@ -187,6 +195,30 @@ export async function buildDiscoveryDataset(
     nodes,
     flowShelves,
     groups: offered,
+  }
+}
+
+/**
+ * The answer set exactly as the browser fetches it: the answers, plus the notes
+ * this flow can show.
+ *
+ * The notes are read here rather than inside buildDiscoveryDataset because the
+ * block's own streamed half calls that too, to draw its first page of cards, and
+ * has no use for a single word of guidance. They are read after the build
+ * because the filter half of their scope is the culled groups, which only exist
+ * once the matrix does; it is one small read on a response the CDN holds
+ * for an hour.
+ */
+export async function buildDiscoveryDatasetWire(
+  flowSlug: string,
+  defaultSortParam: string,
+): Promise<PdtDatasetWire | null> {
+  const built = await buildDiscoveryDataset(flowSlug, defaultSortParam)
+  if (!built) return null
+  const flowNotes = await listNotesForFlow(built.flowId)
+  return {
+    ...built.answers,
+    notes: notesTheFlowCanShow(flowNotes, built.nodes.map((node) => node.id), built.answers.groups),
   }
 }
 

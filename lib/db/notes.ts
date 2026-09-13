@@ -33,6 +33,28 @@ export async function listNotes(): Promise<PdtOptionNote[]> {
   return rows.map(rowToNote)
 }
 
+/**
+ * The notes one flow could ever show a shopper: every global note, plus the
+ * overrides scoped to this flow's own nodes.
+ *
+ * Another flow's overrides are left behind because resolveNotes (lib/compare.ts)
+ * only ever lets a node-scoped note win for a node on the shopper's current
+ * path, and every node on that path belongs to this flow - an override for a
+ * node elsewhere can never be picked, so there is no point sending it.
+ *
+ * The other half of the rule, which filters the flow actually offers, is applied
+ * after the answer set is built (lib/notes-scope.ts), because only the match
+ * matrix knows which options survive the cull.
+ */
+export async function listNotesForFlow(flowId: string): Promise<PdtOptionNote[]> {
+  const rows = await prisma.$queryRaw<Record<string, unknown>[]>`
+    SELECT ${NOTE_COLUMNS} FROM "pdt_option_notes"
+    WHERE "node_id" IS NULL
+       OR "node_id" IN (SELECT "id" FROM "pdt_nodes" WHERE "flow_id" = ${flowId})
+  `
+  return rows.map(rowToNote)
+}
+
 export async function upsertNote(fields: {
   filterId: string
   nodeId: string | null

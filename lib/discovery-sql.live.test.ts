@@ -334,6 +334,13 @@ suite('product-discovery-tool raw SQL, against a real Postgres', () => {
     // The tri-state update: a field left out is left alone, not blanked.
     expect(all.find((note) => note.nodeId === null)?.explainer).toBe('Real oak veneer.')
     expect(all.find((note) => note.nodeId === null)?.bestFor).toBe('Warmth')
+
+    // The public reader: this flow's own override and the global note, and for
+    // a flow with no nodes of its own, the global note alone.
+    const forFlow = await db.notes.listNotesForFlow(flow.id)
+    expect(forFlow.map((note) => note.id).sort()).toEqual([global.id, scoped.id].sort())
+    const forNobody = await db.notes.listNotesForFlow('no-such-flow')
+    expect(forNobody.map((note) => note.id)).toEqual([global.id])
     await db.notes.deleteNote(scoped.id)
   })
 
