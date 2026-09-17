@@ -1,5 +1,6 @@
 import { HARD_MAX_PER_PAGE, listTags } from '@/modules/shop/lib/db'
 import { getShopConfigCached } from '@/modules/shop/lib/config'
+import { resolveTaxDisplay } from '@/modules/shop/lib/tax-display'
 import { buildCardContext, buildTagMaps } from '@/modules/shop/lib/card-template'
 import { resolveCardFromPrices } from '@/modules/shop/lib/card-price'
 import { listGroups } from '@/modules/filters-for-shop/lib/db/filters'
@@ -92,8 +93,12 @@ export async function buildDiscoveryDataset(
   const flow = await getFlowBySlug(flowSlug)
   if (!flow) return null
 
-  const [config, tags, nodes, groups] = await Promise.all([
+  const [config, taxDisplay, tags, nodes, groups] = await Promise.all([
     getShopConfigCached(),
+    // So the price bands below are cut against the figure the card PRINTS - the
+    // rendered cards convert through shop's grid-page, and a band on the stored
+    // figure disagreed with them on any shop printing the other side of tax.
+    resolveTaxDisplay(),
     listTags(),
     listNodes(flow.id),
     listGroups(),
@@ -131,7 +136,7 @@ export async function buildDiscoveryDataset(
   // RENDERED cards only, back in the block.
   const priceOf = new Map<string, number>()
   for (const product of products) {
-    const ctx = buildCardContext(product, [], tagById, [], config.currencySymbol, config, fromPrices.get(product.id) ?? null, undefined, tagsById)
+    const ctx = buildCardContext(product, [], tagById, [], config.currencySymbol, { ...config, taxDisplay }, fromPrices.get(product.id) ?? null, undefined, tagsById)
     priceOf.set(product.id, Number(ctx.fromPrice ?? ctx.prices.now))
   }
   // PRICE groups, banded against the same figure the card prints, so a budget

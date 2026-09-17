@@ -2,6 +2,7 @@ import type { Data } from '@puckeditor/core'
 import { withCardAdminEditHrefs } from '@/modules/shop/lib/card-template'
 import { injectShopProductCardEmbed } from '@/modules/shop/lib/inject-part-context'
 import { formatMoney } from '@/modules/shop/lib/money'
+import { TaxViewMoney, TaxViewNote } from '@/modules/shop/components/public/TaxViewText'
 import { productHref, type ProductUrlStyle } from '@/modules/shop/lib/product-url'
 import type { PuckData } from '@/modules/shop/lib/types'
 import type { CardItem } from '@/modules/shop/lib/card-template'
@@ -59,13 +60,16 @@ export async function renderDiscoveryCards(template: PuckData | null, items: Car
           <h3 className="shop-card-name">{product.name}</h3>
           <div className="shop-card-pricerow">
             {ctx.fromPrice != null ? (
-              <span className="shop-card-price">{ctx.fromPriceVaries ? 'From ' : ''}{formatMoney(ctx.fromPrice, ctx.currencySymbol)}</span>
+              <span className="shop-card-price">{ctx.fromPriceVaries ? 'From ' : ''}<TaxViewMoney amount={Number(ctx.fromPrice)} view={ctx.taxView} format={(n) => formatMoney(n, ctx.currencySymbol)} /></span>
             ) : (
               <>
-                <span className="shop-card-price">{formatMoney(ctx.prices.now, ctx.currencySymbol)}</span>
-                {ctx.prices.was && <span className="shop-card-compare">{formatMoney(ctx.prices.was, ctx.currencySymbol)}</span>}
+                <span className="shop-card-price"><TaxViewMoney amount={Number(ctx.prices.now)} view={ctx.taxView} format={(n) => formatMoney(n, ctx.currencySymbol)} /></span>
+                {ctx.prices.was && <span className="shop-card-compare"><TaxViewMoney amount={Number(ctx.prices.was)} view={ctx.taxView} format={(n) => formatMoney(n, ctx.currencySymbol)} /></span>}
               </>
             )}
+            {/* Shop's own fallback card prints the tax wording too, and it follows the
+                shopper's VAT switch with the figures (lib/tax-view-shared.ts). */}
+            <TaxViewNote view={ctx.taxView} suffix={ctx.priceSuffix} className="shop-card-taxnote" />
           </div>
         </>
       )}
