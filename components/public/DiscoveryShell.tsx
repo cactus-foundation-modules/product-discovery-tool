@@ -1099,15 +1099,15 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
 
   return (
     <div className="pdt-wrap" ref={wrapRef}>
-      <div className="pdt-progress" {...PDT_UNSTYLED}>
-        {stepIndex > 0 && (
+      {stepIndex > 0 && (
+        <div className="pdt-progress" {...PDT_UNSTYLED}>
           <button type="button" className="pdt-back" onClick={() => backTo(stepIndex - 1)}>‹ Back</button>
-        )}
-        <span className="pdt-progress-track" aria-hidden>
-          <span className="pdt-progress-fill" style={{ width: `${Math.round((stepNumber / totalSteps) * 100)}%` }} />
-        </span>
-        <span className="pdt-progress-text">Step {stepNumber} of {totalSteps}</span>
-      </div>
+          <span className="pdt-progress-track" aria-hidden>
+            <span className="pdt-progress-fill" style={{ width: `${Math.round((stepNumber / totalSteps) * 100)}%` }} />
+          </span>
+          <span className="pdt-progress-text">Step {stepNumber} of {totalSteps}</span>
+        </div>
+      )}
 
       <div className="pdt-step-head">
         <h2 className="pdt-step-title" ref={headingRef} tabIndex={-1}>{heading}</h2>
