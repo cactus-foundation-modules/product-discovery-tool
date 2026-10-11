@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PdtFlow, PdtNode, PdtOptionNote, PdtQuestion } from '@/modules/product-discovery-tool/lib/types'
 import { EMPTY_VOCABULARY, PDT_API, useSender, type PdtVocabulary } from '@/modules/product-discovery-tool/components/admin/shared'
+import { useAdminConfirm } from '@/components/admin/useAdminConfirm'
 import { FlowScreen } from '@/modules/product-discovery-tool/components/admin/FlowScreen'
 import { QuestionsScreen } from '@/modules/product-discovery-tool/components/admin/QuestionsScreen'
 import { GuidanceScreen } from '@/modules/product-discovery-tool/components/admin/GuidanceScreen'
@@ -28,6 +29,7 @@ type Counts = { total: number; counts: Record<string, number>; missingScope: str
 const EMPTY_COUNTS: Counts = { total: 0, counts: {}, missingScope: [], flowScopeMissing: false }
 
 export function DiscoveryScreen({ adminPath }: { adminPath: string }) {
+  const [askConfirm, confirmNode] = useAdminConfirm()
   const [flows, setFlows] = useState<PdtFlow[]>([])
   const [vocab, setVocab] = useState<PdtVocabulary>(EMPTY_VOCABULARY)
   const [notes, setNotes] = useState<PdtOptionNote[]>([])
@@ -129,6 +131,7 @@ export function DiscoveryScreen({ adminPath }: { adminPath: string }) {
 
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
+      {confirmNode}
       <div>
         <h1 style={{ fontSize: '1.25rem', margin: '0 0 0.25rem' }}>Product Discovery</h1>
         <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: '0.875rem', maxWidth: '62ch' }}>
@@ -168,7 +171,7 @@ export function DiscoveryScreen({ adminPath }: { adminPath: string }) {
             className="btn btn-danger"
             disabled={busy}
             onClick={async () => {
-              if (!window.confirm(`Delete “${flow.name}” and everything in it?`)) return
+              if (!(await askConfirm({ title: `Delete “${flow.name}”?`, message: 'Everything in it is deleted too.' }))) return
               selectFlow(null)
               await send(`${PDT_API}/flows/${flow.id}`, 'DELETE')
             }}

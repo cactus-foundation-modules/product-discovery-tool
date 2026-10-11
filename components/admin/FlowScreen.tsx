@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { buildNodeTree, PDT_CHOICE_TOKEN, PDT_DEFAULT_HEADINGS, type PdtTreeNode } from '@/modules/product-discovery-tool/lib/flow'
 import type { PdtFlow, PdtNode } from '@/modules/product-discovery-tool/lib/types'
 import { CARD, HINT, LABEL, PDT_API, scopeOptions, type PdtVocabulary } from '@/modules/product-discovery-tool/components/admin/shared'
+import { useAdminConfirm } from '@/components/admin/useAdminConfirm'
 import { PicturePicker } from '@/modules/product-discovery-tool/components/admin/PicturePicker'
 
 // The tree builder.
@@ -351,11 +352,13 @@ function NodeEditor({ node, vocab, send, busy, onDeleted }: {
 }) {
   const [draft, setDraft] = useState(node)
   const [filterIds, setFilterIds] = useState<string[]>(node.filterIds)
+  const [askConfirm, confirmNode] = useAdminConfirm()
   const set = <K extends keyof PdtNode>(key: K, value: PdtNode[K]) => setDraft((prev) => ({ ...prev, [key]: value }))
   const options = scopeOptions(vocab, draft.scopeType)
 
   return (
     <div style={{ marginTop: '0.9rem', paddingTop: '0.9rem', borderTop: '1px solid var(--color-border)', display: 'grid', gap: '0.75rem' }}>
+      {confirmNode}
       <div style={{ display: 'grid', gap: '0.75rem', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 15rem), 1fr))' }}>
         <label>
           <span style={LABEL}>Label</span>
@@ -464,7 +467,7 @@ function NodeEditor({ node, vocab, send, busy, onDeleted }: {
           className="btn btn-danger"
           disabled={busy}
           onClick={async () => {
-            if (!window.confirm(`Delete “${node.label}” and everything under it?`)) return
+            if (!(await askConfirm({ title: `Delete “${node.label}”?`, message: 'Everything under it is deleted too.' }))) return
             await send(`${PDT_API}/nodes/${node.id}`, 'DELETE')
             onDeleted()
           }}
