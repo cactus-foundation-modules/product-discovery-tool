@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { renderToString } from 'react-dom/server'
-import { StepBrowse, type PdtBrowseOption } from '@/modules/product-discovery-tool/components/public/StepBrowse'
+import { StepBrowse, deeperGridClass, type PdtBrowseOption } from '@/modules/product-discovery-tool/components/public/StepBrowse'
 import type { PdtTreeNode } from '@/modules/product-discovery-tool/lib/flow'
 
 // The flow's answer set is fetched after the first paint rather than serialised
@@ -44,6 +44,7 @@ function renderMarkup(options: PdtBrowseOption[]): string {
   return renderToString(
     <StepBrowse
       legend="What are you after?"
+      deeper={false}
       options={options}
       showCounts
       allowSkip={false}
@@ -97,5 +98,15 @@ describe('a browse tile whose count has not arrived yet', () => {
     const html = render([{ node: node('chairs', 'Chairs'), count: 1 }])
     expect(html).toContain('1 product')
     expect(html).not.toContain('1 products')
+  })
+})
+
+describe('deeperGridClass', () => {
+  it('picks the grid by how many tiles there are', () => {
+    expect(deeperGridClass(4)).toBe(' pdt-grid-4')
+    expect(deeperGridClass(8)).toBe(' pdt-grid-4')
+    expect(deeperGridClass(6)).toBe(' pdt-grid-3')
+    expect(deeperGridClass(15)).toBe(' pdt-grid-3 pdt-grid-lead')
+    expect(deeperGridClass(5)).toBe('')
   })
 })

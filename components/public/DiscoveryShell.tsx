@@ -135,6 +135,11 @@ export type DiscoveryShellProps = {
    *  first step is a real question and both earn their place. The block
    *  decides, because only the person who built the flow knows which it is. */
   firstStepFoot: boolean
+  /** Whether the tiles on the first browse step, and on the steps after it, show
+   *  how many products lie behind them. The block decides, falling back to the
+   *  flow's own setting. */
+  showCountsFirst?: boolean
+  showCountsLater?: boolean
   /** The order the results arrive in, before the shopper touches the dropdown.
    *  The server has already rendered page one in it. */
   defaultSort: FltSortValue
@@ -185,7 +190,7 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
   const {
     flowSlug, allowSkip, finishCta, headings, settings, nodes, questions,
     datasetHref, initialCounts = EMPTY_COUNTS, initialMatchCount = null, columns, pageSize, questionsPosition, autoOpenQuestions, drawerOptions,
-    firstStepFoot, defaultSort, barButton, cardFonts, tabletBp, initialPick, loadCards, children,
+    firstStepFoot, showCountsFirst, showCountsLater, defaultSort, barButton, cardFonts, tabletBp, initialPick, loadCards, children,
   } = props
 
   // The fetched answer set, and everything read off it.
@@ -1133,8 +1138,9 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
       {step.kind === 'browse' ? (
         <StepBrowse
           legend={heading}
+          deeper={stepIndex > 0}
           options={browseOptions}
-          showCounts={settings.showCounts}
+          showCounts={(stepIndex === 0 ? showCountsFirst : showCountsLater) ?? settings.showCounts}
           allowSkip={allowSkip && footHere}
           canCompare={settings.compareEnabled && footHere && hasComparison(compareNodes(step.options))}
           onPick={pick}

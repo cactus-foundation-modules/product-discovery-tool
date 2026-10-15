@@ -65,6 +65,15 @@ import { CardGridSkeleton } from '@/components/CardGridSkeleton'
 // Deliberately NOT a fix to the one-pass bargain: the counts on a browse card and
 // the products behind it are only the same answer because one pass produced both
 // (see DiscoveryShell). The counts travel with that pass and arrive with it.
+// A block's own say on whether a browse step's tiles show their product count.
+// Anything but an explicit show or hide - blank, 'default', a block saved before
+// the field existed - follows the flow's setting.
+function countsFor(choice: string | undefined, flowSetting: boolean): boolean {
+  if (choice === 'show') return true
+  if (choice === 'hide') return false
+  return flowSetting
+}
+
 export async function ProductDiscoveryRsc(props: ProductDiscoveryProps) {
   return ProductDiscoveryBody(props)
 }
@@ -158,6 +167,8 @@ async function ProductDiscoveryBody(props: ProductDiscoveryProps) {
         // plainer first step rather than two buttons nobody asked for. A flow
         // whose first step is a real narrowing question turns them back on.
         firstStepFoot={props.firstStepFoot === 'show'}
+        showCountsFirst={countsFor(props.showCountsStep1, settings.showCounts)}
+        showCountsLater={countsFor(props.showCountsStep2, settings.showCounts)}
         barButton={{
           bg: (props.barButtonBg ?? '').trim(),
           text: (props.barButtonText ?? '').trim(),

@@ -23,8 +23,23 @@ export type PdtBrowseOption = {
   count: number | null
 }
 
+// The grid a DEEPER step (anything after the first) is drawn in. Step one keeps
+// its fixed pattern (two wide, then threes); below it the number of tiles
+// varies by category, so the shape follows the count: fours and eights go four
+// across, sixes and fifteens go three across, and on a tablet or phone the fours
+// and sixes go in pairs while a fifteen puts its first tile on a line of its own
+// and pairs the rest. Any other count keeps the first-step pattern, which is
+// what it did before this existed.
+export function deeperGridClass(count: number): string {
+  if (count === 4 || count === 8) return ' pdt-grid-4'
+  if (count === 6) return ' pdt-grid-3'
+  if (count === 15) return ' pdt-grid-3 pdt-grid-lead'
+  return ''
+}
+
 export function StepBrowse({
   legend,
+  deeper,
   options,
   showCounts,
   allowSkip,
@@ -35,6 +50,8 @@ export function StepBrowse({
   onCompare,
 }: {
   legend: string
+  /** True on every browse step after the first. */
+  deeper: boolean
   options: PdtBrowseOption[]
   showCounts: boolean
   allowSkip: boolean
@@ -62,7 +79,7 @@ export function StepBrowse({
       {/* A real fieldset with a legend: this is a single-answer question, and a
           screen reader should hear it as one. The legend is visually hidden
           because the step heading above already says it on screen. */}
-      <fieldset className="pdt-browse" {...PDT_UNSTYLED}>
+      <fieldset className={`pdt-browse${deeper ? deeperGridClass(live.length) : ''}`} {...PDT_UNSTYLED}>
         <legend>{legend}</legend>
         {live.map(({ node, count }) => {
           const hasMore = !!(node.explainer?.trim())

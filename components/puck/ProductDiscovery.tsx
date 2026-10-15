@@ -50,6 +50,11 @@ export type ProductDiscoveryProps = {
    *  of a catalogue-wide flow asks for the whole shop, which is what the shop's
    *  own grid is for. */
   firstStepFoot?: 'show' | 'hide'
+  /** Whether the first browse step's tiles say how many products are behind
+   *  them, and likewise the steps after it. 'default' (or blank, for a block
+   *  saved before these existed) follows the flow's own "show counts" setting. */
+  showCountsStep1?: 'default' | 'show' | 'hide'
+  showCountsStep2?: 'default' | 'show' | 'hide'
   /** The order the results start in. Spelled as the dropdown spells it, with
    *  'recommended' standing in for the empty value - a Puck select with a blank
    *  value reads as nothing chosen. */
@@ -170,6 +175,16 @@ const layoutField = {
     labelled(LAYOUT_LABEL, <ShopLayoutPicker type="shopProductCard" value={value} onChange={onChange} />),
 }
 
+const countsField = (label: string) => ({
+  type: 'select' as const,
+  label,
+  options: [
+    { value: 'default', label: "Follow the flow's setting" },
+    { value: 'show', label: 'Show' },
+    { value: 'hide', label: 'Hide' },
+  ],
+})
+
 export const productDiscoveryPuckComponent = {
   label: 'Discovery: Guided Flow',
   fields: {
@@ -218,6 +233,8 @@ export const productDiscoveryPuckComponent = {
         { value: 'show', label: 'Offer compare and “not sure yet”' },
       ],
     },
+    showCountsStep1: countsField('Product counts on step one'),
+    showCountsStep2: countsField('Product counts on step two'),
     // The same list the dropdown itself offers, so the two can never drift.
     defaultSort: {
       type: 'select' as const,
@@ -240,6 +257,8 @@ export const productDiscoveryPuckComponent = {
     autoOpenQuestions: 'no',
     drawerOptions: 'side-by-side',
     firstStepFoot: 'hide',
+    showCountsStep1: 'default',
+    showCountsStep2: 'default',
     defaultSort: 'best-selling',
     barButtonBg: '',
     barButtonText: '',

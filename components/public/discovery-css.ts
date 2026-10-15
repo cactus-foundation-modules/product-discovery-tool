@@ -181,6 +181,18 @@ export function discoveryCss({ tabletBp, mobileBp }: Breakpoints): string {
 
 /* Sticky bar and question sheet, tablet and below ------------------------ */
 .pdt-bar{display:none}
+/* Deeper browse steps: the grid follows the number of tiles (see
+   deeperGridClass). Four or eight go four across, six or fifteen three across;
+   the specificity beats the first-step pattern above, which stays for every
+   other count. */
+.pdt-browse.pdt-grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.pdt-browse.pdt-grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.pdt-browse.pdt-grid-4>.pdt-choice,.pdt-browse.pdt-grid-3>.pdt-choice{grid-column:span 1;aspect-ratio:1/1}
+@media (max-width:${tabletBp}){
+  .pdt-browse.pdt-grid-4,.pdt-browse.pdt-grid-3{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  .pdt-browse.pdt-grid-4>.pdt-choice,.pdt-browse.pdt-grid-3>.pdt-choice{aspect-ratio:4/5}
+  .pdt-browse.pdt-grid-lead>.pdt-choice:first-of-type{grid-column:span 2;aspect-ratio:917/660}
+}
 @media (max-width:${tabletBp}){
   .pdt-features{grid-template-columns:1fr}
   .pdt-questions{position:fixed;inset:auto 0 0 0;z-index:${SHEET_Z + 1};background:var(--color-surface);border-top:1px solid var(--color-border);border-radius:16px 16px 0 0;max-height:80vh;overflow:auto;padding:0 20px 20px;transform:translateY(100%);transition:transform .22s ease}
@@ -282,6 +294,7 @@ export function discoveryCss({ tabletBp, mobileBp }: Breakpoints): string {
   .pdt-browse{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
   .pdt-choice,.pdt-choice:nth-of-type(-n+2){grid-column:span 1;aspect-ratio:4/5}
   .pdt-browse>.pdt-choice:first-of-type{grid-column:span 2;aspect-ratio:917/660}
+  .pdt-browse.pdt-grid-4>.pdt-choice:first-of-type,.pdt-browse.pdt-grid-3:not(.pdt-grid-lead)>.pdt-choice:first-of-type{grid-column:span 1;aspect-ratio:4/5}
   .pdt-choice{border-radius:16px}
   .pdt-choice-body{padding:56px 14px 14px}
   .pdt-choice-label{font-size:1.25rem}
