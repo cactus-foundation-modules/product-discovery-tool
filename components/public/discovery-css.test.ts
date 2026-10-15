@@ -101,17 +101,23 @@ describe('discovery stylesheet', () => {
     expect(reduced?.body).toContain('.pdt-choice:hover{transform:none}')
   })
 
-  it('crops every browse picture square', () => {
-    expect(/\.pdt-choice-pic\{([^}]*)\}/.exec(css)?.[1] ?? '').toContain('aspect-ratio:1/1')
-    expect(/\.pdt-choice-icon\{([^}]*)\}/.exec(css)?.[1] ?? '').toContain('aspect-ratio:1/1')
+  it('lays the browse cards out two wide, then three, and one then pairs on a phone', () => {
+    // Six tracks: the first two cards take three each, the rest take two. A
+    // phone has two tracks, the first card takes both and the rest take one.
+    expect(/\.pdt-browse\{([^}]*)\}/.exec(css)?.[1] ?? '').toContain('grid-template-columns:repeat(6,')
+    expect(/\.pdt-choice\{([^}]*)\}/.exec(css)?.[1] ?? '').toContain('grid-column:span 2')
+    expect(/\.pdt-choice:nth-of-type\(-n\+2\)\{([^}]*)\}/.exec(css)?.[1] ?? '').toContain('grid-column:span 3')
+    const phone = mediaBlocks(css).find((block) => block.condition.includes('max-width') && block.body.includes('.pdt-browse{'))
+    expect(phone?.body).toContain('grid-template-columns:repeat(2,')
+    expect(phone?.body).toContain('.pdt-browse>.pdt-choice:first-of-type{grid-column:span 2')
   })
 
-  it('spans the browse grid when the buttons take a row of their own', () => {
-    // In a spare cell they are one above the other; on a row of their own they
-    // span every column and centre. Getting `is-below` wrong strands them under
-    // the first card.
-    expect(/\.pdt-browse-foot\.is-below\{([^}]*)\}/.exec(css)?.[1] ?? '').toContain('grid-column:1/-1')
-    expect(/\.pdt-browse-foot\.is-beside\{([^}]*)\}/.exec(css)?.[1] ?? '').toContain('flex-direction:column')
+  it('fills each browse card with its picture', () => {
+    expect(/\.pdt-choice-pic\{([^}]*)\}/.exec(css)?.[1] ?? '').toContain('position:absolute')
+  })
+
+  it('spans the browse grid for the buttons under the cards', () => {
+    expect(/\.pdt-browse-foot\{grid-column([^}]*)\}/.exec(css)?.[0] ?? '').toContain('grid-column:1/-1')
   })
 
   it('opens a question across the whole row, options and all', () => {

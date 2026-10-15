@@ -60,26 +60,40 @@ export function discoveryCss({ tabletBp, mobileBp }: Breakpoints): string {
 .pdt-clear:focus-visible{outline:2px solid var(--color-primary);outline-offset:2px}
 
 /* Browse steps ---------------------------------------------------------- */
-.pdt-browse{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));margin:0;padding:0;border:0}
+/* Image cards, the picture running edge to edge behind the words. Six tracks so
+   one grid can do both rows of the pattern: the first two cards take three
+   tracks each (two across), every card after them takes two (three across). A
+   phone drops to two tracks: the first card takes both, the rest take one each,
+   which is one on top and then pairs. The pattern is by position, not by count,
+   so a flow with four or six types still reads as a deliberate layout. */
+.pdt-browse{display:grid;gap:16px;grid-template-columns:repeat(6,minmax(0,1fr));margin:0;padding:0;border:0}
 .pdt-browse legend{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
-.pdt-choice{position:relative;display:flex;flex-direction:column;border:1px solid var(--color-border);border-radius:14px;background:var(--color-surface);overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06);transition:box-shadow .25s ease,transform .25s ease,border-color .25s ease,background .25s ease}
+.pdt-choice{grid-column:span 2;position:relative;display:block;aspect-ratio:1/1;border-radius:20px;background:#22403f;overflow:hidden;isolation:isolate;transition:box-shadow .25s ease,transform .25s ease}
+.pdt-choice:nth-of-type(-n+2){grid-column:span 3;aspect-ratio:917/660}
 .pdt-choice:has(.pdt-choice-pick:focus-visible){outline:2px solid var(--color-primary);outline-offset:2px}
 /* The same lift, easing and shadow as shop's own product card, deliberately
    copied value for value: these are cards in the same flow as those, and two
    nearly-identical hovers read as a bug rather than as two components. */
-.pdt-choice:hover{transform:translateY(-4px);box-shadow:0 8px 30px rgba(0,0,0,.10);border-color:var(--color-primary);background:var(--color-primary-subtle)}
-.pdt-choice-pick{appearance:none;border:0;background:none;padding:0;margin:0;font:inherit;color:inherit;text-align:left;cursor:pointer;display:flex;flex-direction:column;flex:1 1 auto}
+.pdt-choice:hover{transform:translateY(-4px);box-shadow:0 8px 30px rgba(0,0,0,.10)}
+.pdt-choice-pick{appearance:none;border:0;background:none;padding:0;margin:0;font:inherit;color:inherit;text-align:left;cursor:pointer;display:block;position:absolute;inset:0;width:100%;height:100%}
 .pdt-choice-pick:focus{outline:none}
-/* Square, not 4:3. The pictures behind these cards are ordinary product
-   photography of wildly different things - a locker, a monitor arm, a booth -
-   and a square crop is the one shape that treats them all the same. */
-.pdt-choice-pic{aspect-ratio:1/1;background:var(--color-bg-subtle);display:block;width:100%;object-fit:cover}
-.pdt-choice-icon{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;background:var(--color-bg-subtle);font-size:2rem}
-.pdt-choice-body{display:flex;flex-direction:column;gap:4px;padding:14px 16px}
-.pdt-choice-label{font-weight:600;font-size:1rem;color:var(--color-text)}
-.pdt-choice-blurb{font-size:.875rem;color:var(--color-text-muted);line-height:1.45}
-.pdt-choice-count{font-size:.8125rem;color:var(--color-text-muted)}
-.pdt-choice-more{display:flex;gap:12px;padding:0 16px 12px}
+/* The photograph is the card. object-fit:cover crops every picture to the
+   card's own shape, so a locker, a monitor arm and a booth all fill it alike. */
+.pdt-choice-pic{position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:cover;z-index:-2;transition:transform .4s ease}
+.pdt-choice:hover .pdt-choice-pic{transform:scale(1.03)}
+.pdt-choice-icon{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:3rem;z-index:-2;padding-bottom:30%}
+/* The words sit on a dark teal wash that rises from the foot of the card. The
+   colours here are fixed, not theme tokens: they are laid over a photograph,
+   not over the page, so they must read the same in light and dark mode. */
+.pdt-choice-body{position:absolute;inset:auto 0 0 0;display:flex;flex-direction:column;gap:6px;padding:72px 24px 22px;background:linear-gradient(to bottom,rgba(20,48,52,0) 0,rgba(20,48,52,.72) 46%,rgba(20,48,52,.92) 100%);color:#faf6ee}
+.pdt-choice-label{font-family:var(--font-heading,Georgia,serif);font-weight:500;font-size:clamp(1.5rem,2.6vw,2.125rem);line-height:1.05;letter-spacing:-.01em;color:#faf6ee}
+.pdt-choice-blurb{font-size:.9375rem;color:rgba(250,246,238,.86);line-height:1.5;max-width:34ch}
+.pdt-choice-count{font-size:.8125rem;color:rgba(250,246,238,.7)}
+/* Out of the flow and in the corner, so it never competes with the card's own
+   words; still a real button above the card's pick button. */
+.pdt-choice-more{position:absolute;top:12px;right:12px;z-index:1}
+.pdt-choice-more .pdt-choice-explain{display:inline-block;padding:5px 11px;border-radius:999px;background:rgba(20,48,52,.72);color:#faf6ee;text-decoration:none;backdrop-filter:blur(4px)}
+.pdt-choice-more .pdt-choice-explain:hover{background:rgba(20,48,52,.92);color:#fff}
 .pdt-link{appearance:none;border:0;background:none;padding:0;font:inherit;font-size:.8125rem;color:var(--color-primary);text-decoration:underline;cursor:pointer}
 /* A link hover changes the TEXT and nothing else. No fill: these sit inside
    paragraphs and under options, where a pill of colour behind three words reads
@@ -87,14 +101,10 @@ export function discoveryCss({ tabletBp, mobileBp }: Breakpoints): string {
    one without either being spelled out. */
 .pdt-link:hover{color:var(--color-text)}
 .pdt-link:focus-visible{outline:2px solid var(--color-primary);outline-offset:2px}
-/* Sits IN the browse grid (see StepBrowse). is-beside is the spare cell at the
-   end of a short last row - one button above the other, centred in the hole
-   they are filling. is-below is a row of its own, spanning the lot and centred,
-   which is the only arrangement that does not look abandoned at one end of an
-   otherwise full row. */
+/* Sits IN the browse grid, on a row of its own, spanning every track and
+   centred. */
 .pdt-browse-foot{display:flex;gap:12px}
-.pdt-browse-foot.is-below{grid-column:1/-1;flex-wrap:wrap;align-items:center;justify-content:center;padding-top:4px}
-.pdt-browse-foot.is-beside{flex-direction:column;align-items:center;justify-content:center;gap:14px}
+.pdt-browse-foot{grid-column:1/-1;flex-wrap:wrap;align-items:center;justify-content:center;padding-top:4px}
 .pdt-browse-foot .pdt-skip{padding:12px 26px;font-size:.9375rem}
 .pdt-skip{appearance:none;border:1px solid var(--color-border);background:var(--color-surface);border-radius:999px;padding:8px 16px;font:inherit;font-size:.875rem;color:var(--color-text);cursor:pointer}
 .pdt-skip:hover{border-color:var(--color-primary)}
@@ -264,12 +274,18 @@ export function discoveryCss({ tabletBp, mobileBp }: Breakpoints): string {
 @media (prefers-reduced-motion:reduce){
   .pdt-choice{transition:border-color .25s ease,background .25s ease}
   .pdt-choice:hover{transform:none}
+  .pdt-choice:hover .pdt-choice-pic{transform:none}
   .pdt-progress-fill,.pdt-dialog,.pdt-questions,.pdt-scrim{transition:none}
 }
 
 @media (max-width:${mobileBp}){
-  .pdt-browse{grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:12px}
-  .pdt-choice-body{padding:12px}
+  .pdt-browse{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  .pdt-choice,.pdt-choice:nth-of-type(-n+2){grid-column:span 1;aspect-ratio:4/5}
+  .pdt-browse>.pdt-choice:first-of-type{grid-column:span 2;aspect-ratio:917/660}
+  .pdt-choice{border-radius:16px}
+  .pdt-choice-body{padding:56px 14px 14px}
+  .pdt-choice-label{font-size:1.25rem}
+  .pdt-choice-blurb{font-size:.8125rem;line-height:1.4}
   .pdt-compare{min-width:420px}
 }
 `
