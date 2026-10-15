@@ -125,6 +125,9 @@ export type DiscoveryShellProps = {
   /** The "Narrow down" button's own colours, each possibly carrying a dark-mode
    *  arm as light-dark(l, d). Empty strings mean the module's own. */
   barButton: { bg: string; text: string; hoverBg: string; hoverText: string }
+  /** Font families for the browse cards' title and description. Empty strings
+   *  leave the stylesheet's own (site heading and body fonts). */
+  cardFonts: { title: string; description: string }
   /** Whether the FIRST browse step offers "Compare these" and "Not sure yet".
    *  Deeper steps always do. On a flow that opens on "what are you looking
    *  for?" both are noise - skipping it asks for the whole catalogue, which is
@@ -182,7 +185,7 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
   const {
     flowSlug, allowSkip, finishCta, headings, settings, nodes, questions,
     datasetHref, initialCounts = EMPTY_COUNTS, initialMatchCount = null, columns, pageSize, questionsPosition, autoOpenQuestions, drawerOptions,
-    firstStepFoot, defaultSort, barButton, tabletBp, initialPick, loadCards, children,
+    firstStepFoot, defaultSort, barButton, cardFonts, tabletBp, initialPick, loadCards, children,
   } = props
 
   // The fetched answer set, and everything read off it.
@@ -1050,6 +1053,15 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
     return style as React.CSSProperties
   }, [barButton.bg, barButton.text, barButton.hoverBg, barButton.hoverText])
 
+  // Handed to the stylesheet as custom properties, like the bar button's
+  // colours; an empty choice writes nothing so the rule's own fallback stands.
+  const wrapStyle = useMemo(() => {
+    const style: Record<string, string> = {}
+    if (cardFonts.title) style['--pdt-card-title-font'] = cardFonts.title
+    if (cardFonts.description) style['--pdt-card-desc-font'] = cardFonts.description
+    return style as React.CSSProperties
+  }, [cardFonts.title, cardFonts.description])
+
   // "Compare these" and "Not sure yet" under a browse step - everywhere but the
   // first step, where the block decides.
   const footHere = firstStepFoot || stepIndex > 0
@@ -1098,7 +1110,7 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
   )
 
   return (
-    <div className="pdt-wrap" ref={wrapRef}>
+    <div className="pdt-wrap" ref={wrapRef} style={wrapStyle}>
       {stepIndex > 0 && (
         <div className="pdt-progress" {...PDT_UNSTYLED}>
           <button type="button" className="pdt-back" onClick={() => backTo(stepIndex - 1)}>‹ Back</button>

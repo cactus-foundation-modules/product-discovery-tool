@@ -21,10 +21,9 @@ import { PDT_DATASET_WIRE_VERSION } from '@/modules/product-discovery-tool/lib/d
 import { DiscoveryShell } from '@/modules/product-discovery-tool/components/public/DiscoveryShell'
 import { discoveryCss } from '@/modules/product-discovery-tool/components/public/discovery-css'
 import { productDiscoveryPuckComponent, type ProductDiscoveryProps } from './ProductDiscovery'
+import { googleFontHrefForFamily } from '@/lib/design/tokens'
 import { SharedStyle } from '@/components/SharedStyle'
 import { CardGridSkeleton } from '@/components/CardGridSkeleton'
-import { findRenditionUrls } from '@/lib/media/rendition-lookup'
-import { THUMB_RENDITION_SUFFIX } from '@/lib/media/thumb-renditions'
 
 // Server (RSC) half of Discovery: Guided Flow.
 //
@@ -101,21 +100,13 @@ async function ProductDiscoveryBody(props: ProductDiscoveryProps) {
     getSettings(),
   ])
 
-  // The browse pictures, at the size they are actually drawn.
-  //
-  // A choice tile shows its picture at 216px square and was being handed the
-  // original: measured on the live homepage, five of them came to 988 KB - one was
-  // 1920x1920 - which made them the heaviest thing left on the page by a distance.
-  // One batched lookup for the whole flow, from the sharp-free half of the media
-  // library, and a node whose picture has no small copy keeps the original.
-  const nodeImages = nodes.map((n) => n.imageUrl).filter((u): u is string => !!u)
-  const nodeThumbs = nodeImages.length
-    ? await findRenditionUrls(nodeImages, THUMB_RENDITION_SUFFIX).catch(() => new Map<string, string>())
-    : new Map<string, string>()
-  const drawnNodes = nodeThumbs.size
-    ? nodes.map((n) => (n.imageUrl && nodeThumbs.has(n.imageUrl) ? { ...n, imageUrl: nodeThumbs.get(n.imageUrl)! } : n))
-    : nodes
+  // The browse pictures are drawn as full-bleed cards, up to about 900px across,
+  // so the 300px thumbnail copy would be upscaled and soft. The originals are
+  // used as they are; they load lazily.
+  const drawnNodes = nodes
 
+  const titleFont = (props.categoryTitleFont ?? '').trim()
+  const descriptionFont = (props.categoryDescriptionFont ?? '').trim()
   const defaultSort = sortValueFromParam(props.defaultSort || 'best-selling') ?? ''
   const path = parsePickPath(props.pick)
 
@@ -137,6 +128,12 @@ async function ProductDiscoveryBody(props: ProductDiscoveryProps) {
     <>
       <SharedStyle id="shop-cards" css={shopCardCss(bp)} />
       <SharedStyle id="discovery" css={discoveryCss(bp)} />
+      {/* A chosen Google face needs its own stylesheet; a site or system font
+          returns null and adds nothing. */}
+      {[titleFont, descriptionFont].map((family, at) => {
+        const href = googleFontHrefForFamily(family)
+        return href ? <link key={at} rel="stylesheet" href={href} /> : null
+      })}
       <DiscoveryShell
         flowSlug={flow.slug}
         allowSkip={flow.allowSkip}
@@ -167,6 +164,7 @@ async function ProductDiscoveryBody(props: ProductDiscoveryProps) {
           hoverBg: (props.barButtonHoverBg ?? '').trim(),
           hoverText: (props.barButtonHoverText ?? '').trim(),
         }}
+        cardFonts={{ title: titleFont, description: descriptionFont }}
         defaultSort={defaultSort}
         tabletBp={bp.tabletBp}
         initialPick={path.join('/')}

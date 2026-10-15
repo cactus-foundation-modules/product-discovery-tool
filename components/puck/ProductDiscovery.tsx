@@ -1,4 +1,4 @@
-import { SiteColourField } from '@/lib/puck/fields/registry'
+import { SiteColourField, SiteFontField } from '@/lib/puck/fields/registry'
 import { FLT_SORT_OPTIONS, FLT_SORT_RECOMMENDED_PARAM } from '@/modules/filters-for-shop/lib/sort'
 import type { LayoutRef } from '@/lib/puck/LayoutPickerField'
 import { ShopLayoutPicker } from '@/modules/shop/components/public/ShopLayoutPicker'
@@ -63,6 +63,11 @@ export type ProductDiscoveryProps = {
   barButtonText?: string
   barButtonHoverBg?: string
   barButtonHoverText?: string
+  /** The first step's card titles and descriptions. Blank inherits the site's
+   *  heading font for the title and its body font for the description. Each is
+   *  whatever SiteFontField writes: a site font or a Google family. */
+  categoryTitleFont?: string
+  categoryDescriptionFont?: string
   layoutRef?: LayoutRef | null
   /** The browse path the address asked for, from `?pick=`. NOT an editor field -
    *  per-request context written into the block's props by the page route,
@@ -149,6 +154,13 @@ const colourField = (label: string) => ({
   ),
 })
 
+const fontField = (label: string) => ({
+  type: 'custom' as const,
+  label,
+  render: ({ value, onChange }: { value?: string; onChange: (value: string) => void }) =>
+    labelled(label, <SiteFontField value={value ?? ''} onChange={onChange} />),
+})
+
 const LAYOUT_LABEL = 'Card layout'
 
 const layoutField = {
@@ -216,6 +228,8 @@ export const productDiscoveryPuckComponent = {
     barButtonText: colourField('…its text'),
     barButtonHoverBg: colourField('…hovered'),
     barButtonHoverText: colourField('…its text, hovered'),
+    categoryTitleFont: fontField('Category title font (blank uses the site heading font)'),
+    categoryDescriptionFont: fontField('Category description font (blank uses the site body font)'),
     layoutRef: layoutField,
   },
   defaultProps: {
@@ -231,6 +245,8 @@ export const productDiscoveryPuckComponent = {
     barButtonText: '',
     barButtonHoverBg: '',
     barButtonHoverText: '',
+    categoryTitleFont: '',
+    categoryDescriptionFont: '',
     layoutRef: null,
   },
   render: ProductDiscovery,
