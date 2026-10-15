@@ -86,8 +86,8 @@ export function discoveryCss({ tabletBp, mobileBp }: Breakpoints): string {
    colours here are fixed, not theme tokens: they are laid over a photograph,
    not over the page, so they must read the same in light and dark mode. */
 .pdt-choice-body{position:absolute;inset:auto 0 0 0;display:flex;flex-direction:column;gap:6px;padding:72px 24px 22px;background:linear-gradient(to bottom,rgba(20,48,52,0) 0,rgba(20,48,52,.72) 46%,rgba(20,48,52,.92) 100%);color:#faf6ee}
-.pdt-choice-label{font-family:var(--font-heading,Georgia,serif);font-weight:500;font-size:clamp(1.5rem,2.6vw,2.125rem);line-height:1.05;letter-spacing:-.01em;color:#faf6ee}
-.pdt-choice-blurb{font-size:.9375rem;color:rgba(250,246,238,.86);line-height:1.5;max-width:34ch}
+.pdt-choice-label{font-family:var(--pdt-card-title-font,var(--font-heading,inherit));font-weight:500;font-size:clamp(1.5rem,2.6vw,2.125rem);line-height:1.05;letter-spacing:-.01em;color:#faf6ee}
+.pdt-choice-blurb{font-family:var(--pdt-card-desc-font,var(--font-body,inherit));font-size:.9375rem;color:rgba(250,246,238,.86);line-height:1.5;max-width:34ch}
 .pdt-choice-count{font-size:.8125rem;color:rgba(250,246,238,.7)}
 /* Out of the flow and in the corner, so it never competes with the card's own
    words; still a real button above the card's pick button. */
