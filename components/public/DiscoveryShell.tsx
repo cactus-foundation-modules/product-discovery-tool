@@ -503,7 +503,12 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
   // paramForGroupSlug), so there is nothing here to fight over.
   const sortParam = 'sort'
 
+  // The query string the shell last read or wrote. A popstate that leaves it
+  // unchanged is not a step of the flow - see onPop.
+  const searchRef = useRef('')
+
   const readUrl = useCallback(() => {
+    searchRef.current = window.location.search
     const params = new URLSearchParams(window.location.search)
     const nextPath = parsePickPath(params.get(PICK_PARAM))
     const walked = walkPath(roots, nextPath)
@@ -528,6 +533,12 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
   // is the flow's back button, and a shared link is a shared answer set.
   useEffect(() => {
     const onPop = () => {
+      // A same-page anchor (a "Start Shopping" button pointing at #browse) is a
+      // history entry too, and fires popstate on the way in. Treating it as a
+      // step moved focus to the step heading, and that focus scroll cut the
+      // browser's own smooth scroll to the anchor short. Only the query string
+      // carries the flow, so a pop that leaves it alone is none of our business.
+      if (window.location.search === searchRef.current) return
       movedRef.current = true
       readUrl()
     }
@@ -552,6 +563,7 @@ export function DiscoveryShell(props: DiscoveryShellProps) {
       const url = query ? `?${query}` : window.location.pathname
       if (push) window.history.pushState(null, '', url)
       else window.history.replaceState(null, '', url)
+      searchRef.current = window.location.search
     },
     [groups, defaultSort],
   )
