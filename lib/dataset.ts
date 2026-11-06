@@ -18,6 +18,7 @@ import { paramForGroupSlug } from '@/modules/product-discovery-tool/lib/types'
 import type { PdtShelf } from '@/modules/product-discovery-tool/lib/resolve'
 import type { PdtNode } from '@/modules/product-discovery-tool/lib/types'
 import type { PdtDatasetAnswers, PdtDatasetWire } from '@/modules/product-discovery-tool/lib/dataset-wire'
+import { createSharedBuildCache } from '@/modules/product-discovery-tool/lib/dataset-cache'
 
 // The flow's whole answer set, in one place, because two callers need the same
 // one and a second copy of this arithmetic would be a bug waiting to happen.
@@ -90,6 +91,18 @@ export async function buildDiscoveryDataset(
   flowSlug: string,
   defaultSortParam: string,
 ): Promise<PdtDatasetBuild | null> {
+  // Keyed on the sort it resolves to rather than what was typed, so a public address
+  // with a made-up sort shares the answer instead of forcing a pass of its own.
+  const sort = sortValueFromParam(defaultSortParam || 'best-selling') ?? ''
+  return datasetCache.get(`${flowSlug}\0${sort}`, () => computeDiscoveryDataset(flowSlug, sort))
+}
+
+// See lib/dataset-cache.ts. An answer of "no such flow" is not kept: the address is
+// public, and a flow created a moment later should be there at once. Callers share
+// what comes back and only ever read it.
+const datasetCache = createSharedBuildCache<PdtDatasetBuild | null>(60_000, 8, (built) => built !== null)
+
+async function computeDiscoveryDataset(flowSlug: string, defaultSort: FltSortValue | ''): Promise<PdtDatasetBuild | null> {
   const flow = await getFlowBySlug(flowSlug)
   if (!flow) return null
 
@@ -169,7 +182,6 @@ export async function buildDiscoveryDataset(
   // the server draws page one, and a grid that arrived in the shop's own order
   // and then re-sorted itself on hydration is a page that visibly rearranges
   // under the shopper.
-  const defaultSort: FltSortValue | '' = sortValueFromParam(defaultSortParam || 'best-selling') ?? ''
   const orderedIds = defaultSort ? sortProductIds(productIds, sortKeys, defaultSort) : productIds
 
   // Interned for the wire, exactly as filters' grid does it: spelled out, a
